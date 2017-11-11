@@ -1,0 +1,4 @@
+twisted
+pyopenssl
+pycrypto
+httpbin

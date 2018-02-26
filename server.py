@@ -16,7 +16,7 @@ ch.setFormatter(formatter)
 logger.addHandler(ch)
 
 if __name__ == "__main__":
-    dns_server_factory = servers.dns.DNSJsonServerFactory()
+    dns_server_factory = servers.dns.DNSJsonServerFactory("example.com")
     reactor.listenUDP(53, dns.DNSDatagramProtocol(dns_server_factory), interface="0.0.0.0")
     reactor.listenTCP(53, dns_server_factory, interface="0.0.0.0")
 

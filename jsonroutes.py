@@ -31,6 +31,14 @@ class JsonRoutes(object):
                 return route_descriptor
         return None
 
+    def get_descriptors(self, route):
+        self._update_route_descriptors()
+        descriptors = []
+        for route_descriptor in self._route_descriptors:
+            if re.fullmatch(route_descriptor["route"], route):
+                descriptors.append(route_descriptor)
+        return descriptors
+
     def _update_route_descriptors(self):
         updated = False
         for path_glob in self.path_globs:

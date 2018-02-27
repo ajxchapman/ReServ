@@ -1,6 +1,7 @@
 import logging
 import logging.handlers
 import os
+import sys
 
 from twisted.internet import reactor
 from twisted.names import dns
@@ -8,6 +9,8 @@ from twisted.names import dns
 import servers.dns
 import servers.http
 
+# Make sure our working directory is sane
+os.chdir(os.path.split(__file__)[0])
 logger = logging.getLogger()
 
 logger.setLevel(logging.DEBUG)
@@ -24,7 +27,7 @@ logger.addHandler(file_handler)
 
 
 if __name__ == "__main__":
-    dns_server_factory = servers.dns.DNSJsonServerFactory("example.com")
+    dns_server_factory = servers.dns.DNSJsonServerFactory(sys.argv[1])
     reactor.listenUDP(53, dns.DNSDatagramProtocol(dns_server_factory), interface="0.0.0.0")
     reactor.listenTCP(53, dns_server_factory, interface="0.0.0.0")
 

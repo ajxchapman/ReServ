@@ -1,8 +1,20 @@
 import logging
 import importlib
+import socket
 
 
 logger = logging.getLogger()
+
+
+def get_ipv4_address(dest="8.8.8.8"):
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect((dest, 80))
+    return s.getsockname()[0]
+
+
+def get_ipv6_address(dest="::1"):
+    # TODO
+    return "::1"
 
 
 def apply_middlewares(routes, match, next_function):

@@ -1,4 +1,6 @@
 import logging
+import logging.handlers
+import os
 
 from twisted.internet import reactor
 from twisted.names import dns
@@ -9,11 +11,17 @@ import servers.http
 logger = logging.getLogger()
 
 logger.setLevel(logging.DEBUG)
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-formatter = logging.Formatter("%(levelname)s - %(message)s")
-ch.setFormatter(formatter)
-logger.addHandler(ch)
+simple_formatter = logging.Formatter("%(levelname)s - %(message)s")
+verbose_formatter = logging.Formatter("%(asctime)s [%(levelname)s] <%(module)s>: %(message)s")
+stdout_handler = logging.StreamHandler()
+stdout_handler.setLevel(logging.INFO)
+stdout_handler.setFormatter(simple_formatter)
+file_handler = logging.handlers.TimedRotatingFileHandler(os.path.join("files", "logs", "server.log"), when='D', interval=1, utc=True)
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(verbose_formatter)
+logger.addHandler(stdout_handler)
+logger.addHandler(file_handler)
+
 
 if __name__ == "__main__":
     dns_server_factory = servers.dns.DNSJsonServerFactory("example.com")

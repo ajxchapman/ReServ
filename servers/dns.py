@@ -14,7 +14,7 @@ class DNSJsonServerFactory(server.DNSServerFactory):
 
     def __init__(self, domain, *args, **kwargs):
         self.middlewares = JsonRoutes(os.path.join("files", "middlewares", "dns_*.json"), key=lambda x: "default" in x, domain=domain)
-        dns_client = clients.dns.DNSJsonClient()
+        dns_client = clients.dns.DNSJsonClient(domain)
         super().__init__(*args, clients=[dns_client], **kwargs)
 
     def handleQuery(self, message, protocol, address):

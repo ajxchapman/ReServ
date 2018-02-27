@@ -6,6 +6,7 @@ from twisted.internet import reactor
 from twisted.names import dns, client
 
 from jsonroutes import JsonRoutes
+from utils import get_ipv4_address, get_ipv6_address
 
 logger = logging.getLogger()
 
@@ -16,10 +17,10 @@ class DNSJsonClient(client.Resolver):
 
     noisy = False
 
-    def __init__(self, domain="example.com", ipv4_address="127.0.0.1", ipv6_address="::1"):
+    def __init__(self, domain, ipv4_address=None, ipv6_address=None):
         self.domain = domain
-        self.ipv4_address = ipv4_address
-        self.ipv6_address = ipv6_address
+        self.ipv4_address = ipv4_address or get_ipv4_address()
+        self.ipv6_address = ipv6_address or get_ipv6_address()
         self.routes = JsonRoutes(os.path.join("files", "routes", "dns_*.json"), domain=self.domain)
         super().__init__(servers=[("8.8.8.8", 53)])
 

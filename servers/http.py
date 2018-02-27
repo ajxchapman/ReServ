@@ -6,7 +6,7 @@ import urllib
 from OpenSSL import SSL
 
 from twisted.internet import ssl
-from twisted.web import server, script, resource, static
+from twisted.web import http, server, script, resource, static
 
 from jsonroutes import JsonRoutes
 from servers.http_resources.simple import SimpleResource
@@ -89,7 +89,34 @@ class HTTPSite(server.Site):
     """
 
     def log(self, request):
-        logger.info(self._logFormatter(self._logDateTime, request))
+        host = http._escape(request.getRequestHostname() or "-")
+        referrer = http._escape(request.getHeader(b"referer") or "-")
+        agent = http._escape(request.getHeader(b"user-agent") or "-")
+        line = '"{ip:s}" - {host:s}:{port:d} .{secure:s} {timestamp:s} "{method:s} {uri:s} {protocol:s}" {code:d} {length:s} "{referrer:s}" "{agent:s}"'
+        line = line.format(
+            ip=http._escape(request.getClientIP() or "-"),
+            host=host,
+            port=request.getHost().port,
+            secure="SEC" if request.isSecure() else "INS",
+            timestamp=self._logDateTime,
+            method=http._escape(request.method),
+            uri=http._escape(request.uri),
+            protocol=http._escape(request.clientproto),
+            code=request.code,
+            length=str(request.sentLength) or "-",
+            referrer=referrer,
+            agent=agent,
+        )
+        logger.info(line)
+
+        if request.content is not None:
+            try:
+                request.content.seek(0, 0)
+                content = request.content.read()
+                if len(content):
+                    logger.info("Content: {}".format(content.decode("UTF-8")))
+            except:
+                pass
 
 
 class SSLContextFactory(ssl.ContextFactory):
@@ -125,6 +152,5 @@ class SSLContextFactory(ssl.ContextFactory):
         # Apply middlewares
         server_name_indication = (connection.get_servername() or b'').decode("UTF-8")
         ctx = apply_middlewares(self.middlewares, server_name_indication, _pick_certificate)(connection)
-        logger.info(ctx)
         if ctx is not None:
             connection.set_context(self.tls_ctx)

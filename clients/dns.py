@@ -13,14 +13,14 @@ class DNSJsonClient(client.Resolver):
     """
     DNS resolver which responds to dns queries based on a JsonRoutes object
     """
-    
+
     noisy = False
 
     def __init__(self, domain="example.com", ipv4_address="127.0.0.1", ipv6_address="::1"):
         self.domain = domain
         self.ipv4_address = ipv4_address
         self.ipv6_address = ipv6_address
-        self.routes = JsonRoutes(os.path.join("files", "routes", "dns_*.json"), domain=self.domain, key=lambda x: "default" in x)
+        self.routes = JsonRoutes(os.path.join("files", "routes", "dns_*.json"), domain=self.domain)
         super().__init__(servers=[("8.8.8.8", 53)])
 
     def _lookup(self, lookup_name, lookup_cls, lookup_type, timeout):

@@ -24,8 +24,8 @@ class HTTPJsonResource(resource.Resource):
     def __init__(self, *args, **kwargs):
         self.registry = static.Registry()
         self.wwwroot = os.path.abspath(os.path.join("files", "wwwroot"))
-        self.routes = JsonRoutes(os.path.join("files", "routes", "http_*.json"), key=lambda x: "default" in x)
-        self.middlewares = JsonRoutes(os.path.join("files", "middlewares", "http_*.json"), key=lambda x: "default" in x)
+        self.routes = JsonRoutes(os.path.join("files", "routes", "http_*.json"))
+        self.middlewares = JsonRoutes(os.path.join("files", "middlewares", "http_*.json"))
         super().__init__(*args, **kwargs)
 
     def getChild(self, name, request):
@@ -101,7 +101,7 @@ class SSLContextFactory(ssl.ContextFactory):
         self.ctx = SSL.Context(SSL.TLSv1_METHOD)
         self.ctx.set_tlsext_servername_callback(self.pick_certificate)
         self.tls_ctx = None
-        self.middlewares = JsonRoutes(os.path.join("files", "middlewares", "ssl_*.json"), key=lambda x: "default" in x)
+        self.middlewares = JsonRoutes(os.path.join("files", "middlewares", "ssl_*.json"))
 
         try:
             dk_path = os.path.join("files", "keys", "domain.key")

@@ -10,6 +10,7 @@ class JsonRoutes(object):
     """
     Helper class to watch a set of JSON files and reload any that have changed.
     """
+    DEFAULT_SORT_KEY=lambda x: 100 if "default" in x else int(''.join(y for y in x if y.isdigit()) or 99)
 
     def __init__(self, *args, key=None, **kwargs):
         self.path_globs = list(args)
@@ -17,7 +18,7 @@ class JsonRoutes(object):
         self.json_routes = {}
         self._route_descriptors = []
         self.format_args = {k : re.escape(v) for k, v in kwargs.items()}
-        self.key = key
+        self.key = key or JsonRoutes.DEFAULT_SORT_KEY
 
     @property
     def route_descriptors(self):

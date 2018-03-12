@@ -10,7 +10,7 @@ import servers.dns
 import servers.http
 
 # Make sure our working directory is sane
-os.chdir(os.path.split(__file__)[0])
+os.chdir(os.path.split(os.path.abspath(__file__))[0])
 logger = logging.getLogger()
 
 logger.setLevel(logging.DEBUG)

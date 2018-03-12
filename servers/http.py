@@ -92,12 +92,12 @@ class HTTPSite(server.Site):
         host = http._escape(request.getRequestHostname() or "-")
         referrer = http._escape(request.getHeader(b"referer") or "-")
         agent = http._escape(request.getHeader(b"user-agent") or "-")
-        line = '"{ip:s}" - {host:s}:{port:d} .{secure:s} {timestamp:s} "{method:s} {uri:s} {protocol:s}" {code:d} {length:s} "{referrer:s}" "{agent:s}"'
+        line = '"{ip:s}" - {scheme:s}://{host:s}:{port:d} {timestamp:s} "{method:s} {uri:s} {protocol:s}" {code:d} {length:s} "{referrer:s}" "{agent:s}"'
         line = line.format(
             ip=http._escape(request.getClientIP() or "-"),
+            scheme="https" if request.isSecure() else "http",
             host=host,
             port=request.getHost().port,
-            secure="SEC" if request.isSecure() else "INS",
             timestamp=self._logDateTime,
             method=http._escape(request.method),
             uri=http._escape(request.uri),

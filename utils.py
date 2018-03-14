@@ -47,3 +47,13 @@ def apply_middlewares(routes, match, next_function):
 
         _func = (lambda m, f, a, k: lambda r: m(r, f, *a, **k))(_middleware_func, _func, _args, _kwargs)
     return _func
+
+
+def exec_cached_script(path):
+    # TODO: Caching, see Twisted resource.IResource and script.ResourceScript
+    with open(path) as f:
+        code = compile(f.read(), path, "exec")
+        global_vars = {}
+        local_vars = {}
+        exec(code, global_vars, local_vars)
+        return local_vars

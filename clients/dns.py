@@ -6,7 +6,7 @@ from twisted.internet import reactor
 from twisted.names import dns, client
 
 from jsonroutes import JsonRoutes
-from utils import get_ipv4_address, get_ipv6_address
+from utils import get_ipv4_address, get_ipv6_address, exec_cached_script
 
 logger = logging.getLogger()
 
@@ -46,10 +46,17 @@ class DNSJsonClient(client.Resolver):
                     if lookup_type == rd_type:
                         logger.debug("Matched route {}".format(repr(route_descriptor)))
 
+                        response = self.ipv6_address if rd_type_name == "AAAA" else self.ipv4_address
                         if "response" in route_descriptor:
                             response = re.sub(route_descriptor["route"], route_descriptor["response"], str_lookup_name).format(domain=self.domain, ipv4=self.ipv4_address, ipv6=self.ipv6_address)
-                        else:
-                            response = self.ipv6_address if rd_type_name == "AAAA" else self.ipv6_address
+                        elif "script" in route_descriptor:
+                            try:
+                                args = route_descriptor.get("args", [])
+                                kwargs = route_descriptor.get("kwargs", {})
+                                get_record = exec_cached_script(route_descriptor["script"])["get_record"]
+                                response = get_record(lookup_name, lookup_cls, lookup_type, *args, **kwargs)
+                            except Exception as e:
+                                logger.exception("Error executing script {}".format(route_descriptor["script"]))
 
                         response = response.encode("UTF-8")
                         ttl = int(route_descriptor.get("ttl", "60"))

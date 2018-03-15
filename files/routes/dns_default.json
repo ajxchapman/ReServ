@@ -1,16 +1,17 @@
 [
   {
     "route" : "([0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}).ip.{domain}",
+    "type" : "A",
     "response" : "\\1"
   },
   {
     "route" : "simple\\.cname\\.{domain}",
-    "type" : "CNAME",
+    "record" : "CNAME",
     "response" : "www.{domain}"
   },
   {
     "route" : "loop\\.cname\\.{domain}",
-    "type" : "CNAME",
+    "record" : "CNAME",
     "response" : "loop.cname.{domain}"
   },
   {

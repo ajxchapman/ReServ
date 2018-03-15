@@ -5,12 +5,12 @@
   },
   {
     "route" : "simple\\.cname\\.{domain}",
-    "record" : "CNAME",
+    "type" : "CNAME",
     "response" : "www.{domain}"
   },
   {
     "route" : "loop\\.cname\\.{domain}",
-    "record" : "CNAME",
+    "type" : "CNAME",
     "response" : "loop.cname.{domain}"
   },
   {

@@ -13,6 +13,14 @@ Features:
 
 Default configuration includes examples for DNS Rebinding attacks ([files/routes/30_dnsrebind.json](files/routes/30_dnsrebind.json)), alerting middleware ([files/routes/30_alert_middleware.json](files/routes/30_alert_middleware.json)) and responding to ACMEv2 dns-01 challenges ([files/routes/10_letsencrypt.json](files/routes/10_letsencrypt.json)).
 
+# Usage
+In order to start the servers use the following command:
+```bash
+$ python3 server.py <domain>
+```
+
+In order to enable HTTPS connections certificate and key files must be generated and stored at `files/keys/domain.crt` and `files/keys/domain.key` respectively.
+
 # Basic Examples
 ## Redirect all DNS A and AAAA queries to a localhost
 `dns_localhost.json`

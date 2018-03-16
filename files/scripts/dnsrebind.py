@@ -79,15 +79,17 @@ class RebindPage(Resource):
         elif path.startswith("/set/"):
             address = path.split("/set/")[1]
             rebindtag = "t" + "".join(random.choice("abcdefghijklmnopqrstuvwxyz0123456789") for _ in range(6))
+            scheme = "https" if request.isSecure() else "http"
+            location = "{}://{}.{}/get/{}".format(scheme, rebindtag, domain, address)
 
             request.setResponseCode(302)
-            request.setHeader("Location", "/dnsrebind/")
+            request.setHeader("Location", location)
             request.setHeader("Content-Type", "text/html; charset=UTF-8")
             return "Redirecting...".encode()
 
         elif path.startswith("/get/"):
-            rebindtag = domain.split(".dnsrebind.")[0]
             address = path.split("/get/")[1]
+            rebindtag = domain.split(".dnsrebind.")[0]
 
             rebind_mappings[rebindtag] = {}
             rebind_mappings[rebindtag]["address"] = address

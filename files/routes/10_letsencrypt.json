@@ -1,7 +1,7 @@
 [
   {
     "protocol" : "dns",
-    "route" : "_acme-challenge\\.webhooks.pw",
+    "route" : "_acme-challenge\\.{domain}",
     "type" : "TXT",
     "response" : ["Challenge1 Response", "Challenge2 Response"]
   }

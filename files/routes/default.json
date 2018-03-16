@@ -1,0 +1,81 @@
+[
+  {
+    "protocol" : "http",
+    "route" : "^/(index\\.html?)?$",
+    "path" : "./wwwroot/index.html",
+    "comment" : "Rule for serving the index file"
+  },
+  {
+    "protocol" : "http",
+    "route" : "^/httpbin/.*",
+    "path" : "./scripts/httpbin.py",
+    "comment" : "Rule for serving httpbin"
+  },
+  {
+    "protocol" : "http",
+    "route" : "^/.well-known/(?:.*/)*([^/]+)$",
+    "path" : "./wwwroot/.well-known/\\1",
+    "headers" : {
+      "content-type" : "text/plain"
+    },
+    "comment" : "Rule for well-known file requests"
+  },
+  {
+    "protocol" : "http",
+    "route" : "^/example/.*",
+    "forward" : "https://www.example.com",
+    "recreate_url" : false,
+    "replace" : [
+      {
+        "pattern" : "[Ee]xample",
+        "replacement" : "Whoot"
+      }
+    ],
+    "comment" : "Rule to forward to example.com"
+  },
+  {
+    "protocol" : "http",
+    "route" : "^/files/(.*)",
+    "path" : "./wwwroot/\\1",
+    "comment" : "Rule for serving files under /files"
+  },
+  {
+    "protocol" : "http",
+    "route" : ".*",
+    "code" : 302,
+    "headers" : {
+      "location" : "/"
+    },
+    "comment" : "Catch-all rule to redirect anything else to index.html"
+  },
+  {
+    "protocol" : "dns",
+    "route" : "([0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}).ip.{domain}",
+    "type" : "A",
+    "response" : "\\1"
+  },
+  {
+    "protocol" : "dns",
+    "route" : "simple\\.cname\\.{domain}",
+    "record" : "CNAME",
+    "response" : "www.{domain}"
+  },
+  {
+    "protocol" : "dns",
+    "route" : "loop\\.cname\\.{domain}",
+    "record" : "CNAME",
+    "response" : "loop.cname.{domain}"
+  },
+  {
+    "protocol" : "dns",
+    "route" : "(.*\\.)?{domain}",
+    "type" : "A",
+    "response" : "{ipv4}"
+  },
+  {
+    "protocol" : "dns",
+    "route" : "(.*\\.)?{domain}",
+    "type" : "AAAA",
+    "response" : "{ipv6}"
+  }
+]

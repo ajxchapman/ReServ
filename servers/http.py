@@ -147,7 +147,7 @@ class SSLContextFactory(ssl.ContextFactory):
         self.ctx = SSL.Context(SSL.TLSv1_METHOD)
         self.ctx.set_tlsext_servername_callback(self.pick_certificate)
         self.tls_ctx = None
-        self.middlewares = JsonRoutes(protocol="ssl")
+        self.middlewares = JsonRoutes(protocol="ssl_middlewares")
 
         try:
             dk_path = os.path.join("files", "keys", "domain.key")

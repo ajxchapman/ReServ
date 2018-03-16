@@ -77,7 +77,7 @@ class HTTPJsonResource(resource.Resource):
                     # Replace regex groups in the route path
                     for i, group in enumerate(re.search(route_descriptor["route"], route_match).groups()):
                         if group is not None:
-                            resource_path = resource_path.replace("\\{}".format(i + 1), group)
+                            resource_path = resource_path.replace("${}".format(i + 1), group)
 
                 # Security: Ensure the absolute resource_path is within the wwwroot!
                 # Prepend the resource_path with the wwwroot and canonicalize

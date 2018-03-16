@@ -74,12 +74,12 @@ class DNSJsonClient(client.Resolver):
                             record_type = lookup_type
                             record_class = getattr(dns, "Record_" + rd_type_name, dns.UnknownRecord)
 
-                        print(responses)
                         for response in responses:
-                            # Replace format strings and regex vars in the response and encode
-                            # response = re.sub(route_descriptor["route"], response, str_lookup_name).format(**self.replace_args).encode()
+                            # Replace regex groups in the route path
+                            for i, group in enumerate(re.search(route_descriptor["route"], str_lookup_name).groups()):
+                                if group is not None:
+                                    response = response.replace("${}".format(i + 1), group)
                             response = response.format(**self.replace_args).encode()
-                            print(response)
                             records.append((lookup_name, record_type, lookup_cls, ttl, record_class(response, ttl=ttl)))
                         break
 

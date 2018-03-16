@@ -1,0 +1,12 @@
+[
+  {
+    "protocol" : "http",
+    "route" : "^https?://([a-z0-9]+\\.)?dnsrebind\\.",
+    "path" : "./scripts/dnsrebind.py"
+  },
+  {
+    "protocol" : "dns",
+    "route" : "[a-z0-9]+\\.dnsrebind\\.{domain}",
+    "script" : "./scripts/dnsrebind.py"
+  }
+]

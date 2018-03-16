@@ -21,7 +21,7 @@ class DNSJsonClient(client.Resolver):
         self.domain = domain
         self.ipv4_address = ipv4_address or get_ipv4_address()
         self.ipv6_address = ipv6_address or get_ipv6_address()
-        self.routes = JsonRoutes(os.path.join("files", "routes", "dns_*.json"), domain=self.domain)
+        self.routes = JsonRoutes(protocol="dns", domain=self.domain)
         self.replace_args = {"domain": self.domain, "ipv4": self.ipv4_address, "ipv6": self.ipv6_address}
         super().__init__(servers=[("8.8.8.8", 53)])
 
@@ -33,7 +33,7 @@ class DNSJsonClient(client.Resolver):
 
         # Access route_descriptors directly to perform complex filtering
         for route_descriptor in self.routes.route_descriptors:
-            if re.fullmatch(route_descriptor["route"], str_lookup_name):
+            if re.search(route_descriptor["route"], str_lookup_name):
                 if lookup_cls == route_descriptor.get("class", dns.IN):
 
                     # Convert the route_descriptor type to an integer
@@ -51,6 +51,7 @@ class DNSJsonClient(client.Resolver):
                         ttl = int(route_descriptor.get("ttl", "60"))
 
                         # Obtain an array of responses
+                        responses = [self.ipv6_address if rd_type_name == "AAAA" else self.ipv4_address]
                         if "response" in route_descriptor:
                             responses = route_descriptor["response"]
                         elif "script" in route_descriptor:
@@ -61,8 +62,6 @@ class DNSJsonClient(client.Resolver):
                                 responses = get_record(lookup_name, lookup_cls, lookup_type, *args, **kwargs)
                             except Exception as e:
                                 logger.exception("Error executing script {}".format(route_descriptor["script"]))
-                        else:
-                            responses = [self.ipv6_address if rd_type_name == "AAAA" else self.ipv4_address]
 
                         if isinstance(responses, str):
                             responses = [responses]
@@ -75,9 +74,12 @@ class DNSJsonClient(client.Resolver):
                             record_type = lookup_type
                             record_class = getattr(dns, "Record_" + rd_type_name, dns.UnknownRecord)
 
+                        print(responses)
                         for response in responses:
                             # Replace format strings and regex vars in the response and encode
-                            response = re.sub(route_descriptor["route"], response, str_lookup_name).format(**self.replace_args).encode()
+                            # response = re.sub(route_descriptor["route"], response, str_lookup_name).format(**self.replace_args).encode()
+                            response = response.format(**self.replace_args).encode()
+                            print(response)
                             records.append((lookup_name, record_type, lookup_cls, ttl, record_class(response, ttl=ttl)))
                         break
 

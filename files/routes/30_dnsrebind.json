@@ -7,6 +7,8 @@
   {
     "protocol" : "dns",
     "route" : "[a-z0-9]+\\.dnsrebind\\.{domain}",
-    "script" : "./scripts/dnsrebind.py"
+    "script" : "./scripts/dnsrebind.py",
+    "ttl" : 5,
+    "type" : "A"
   }
 ]

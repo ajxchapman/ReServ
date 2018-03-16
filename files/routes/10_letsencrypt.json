@@ -1,0 +1,8 @@
+[
+  {
+    "protocol" : "dns",
+    "route" : "_acme-challenge\\.webhooks.pw",
+    "type" : "TXT",
+    "response" : ["Challenge1 Response", "Challenge2 Response"]
+  }
+]

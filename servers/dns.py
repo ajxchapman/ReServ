@@ -13,7 +13,7 @@ class DNSJsonServerFactory(server.DNSServerFactory):
     noisy = False
 
     def __init__(self, domain, *args, **kwargs):
-        self.middlewares = JsonRoutes(os.path.join("files", "middlewares", "dns_*.json"), key=lambda x: "default" in x, domain=domain)
+        self.middlewares = JsonRoutes(protocol="dns_middleware")
         dns_client = clients.dns.DNSJsonClient(domain)
         super().__init__(*args, clients=[dns_client], **kwargs)
 
@@ -42,4 +42,4 @@ class DNSJsonServerFactory(server.DNSServerFactory):
             return _super.handleQuery(message, protocol, address)
 
         name = message.queries[0].name.name.decode("UTF-8")
-        return apply_middlewares(self.middlewares, name, _handleQuery)((message, protocol, address))
+        return apply_middlewares(self.middlewares.get_descriptors(name), _handleQuery)((message, protocol, address))

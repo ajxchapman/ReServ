@@ -2,6 +2,7 @@ import logging
 import logging.handlers
 import os
 import sys
+import argparse
 
 from twisted.internet import reactor
 from twisted.names import dns
@@ -13,6 +14,7 @@ import servers.http
 os.chdir(os.path.split(os.path.abspath(__file__))[0])
 logger = logging.getLogger()
 
+# Setup logginer
 logger.setLevel(logging.DEBUG)
 simple_formatter = logging.Formatter("%(levelname)s - %(message)s")
 verbose_formatter = logging.Formatter("%(asctime)s [%(levelname)s] <%(module)s>: %(message)s")
@@ -27,7 +29,13 @@ logger.addHandler(file_handler)
 
 
 if __name__ == "__main__":
-    dns_server_factory = servers.dns.DNSJsonServerFactory(sys.argv[1])
+    parser = argparse.ArgumentParser(description="research servers")
+    parser.add_argument("domain_name", type=str,
+                        help="the root domain name for the DNS server")
+
+    args = parser.parse_args()
+
+    dns_server_factory = servers.dns.DNSJsonServerFactory(args.domain_name)
     reactor.listenUDP(53, dns.DNSDatagramProtocol(dns_server_factory), interface="0.0.0.0")
     reactor.listenTCP(53, dns_server_factory, interface="0.0.0.0")
 

@@ -1,0 +1,20 @@
+[
+  {
+    "protocol" : "dns_middleware",
+    "route" : "(?:^|\\.|\\?|=|&|/)((?:[a-f0-9]{8}){1,2})(?:\\.|\\?|=|&|/|$)",
+    "module" : "./middlewares/alert.py",
+    "function" : "dns_alert_tag"
+  },
+  {
+    "protocol" : "ssl_middleware",
+    "route" : "(?:^|\\.|\\?|=|&|/)((?:[a-f0-9]{8}){1,2})(?:\\.|\\?|=|&|/|$)",
+    "module" : "./middlewares/alert.py",
+    "function" : "ssl_alert_tag"
+  },
+  {
+    "protocol" : "http_middleware",
+    "route" : "(?:^|\\.|\\?|=|&|/)((?:[a-f0-9]{8}){1,2})(?:\\.|\\?|=|&|/|$)",
+    "module" : "./middlewares/alert.py",
+    "function" : "http_alert_tag"
+  }
+]

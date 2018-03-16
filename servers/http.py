@@ -6,12 +6,12 @@ import urllib
 from OpenSSL import SSL
 
 from twisted.internet import ssl
-from twisted.web import http, server, script, resource, static
+from twisted.web import http, server, resource
 
 from jsonroutes import JsonRoutes
 from servers.http_resources.simple import SimpleResource
 from servers.http_resources.forward import ForwardResource
-from utils import apply_middlewares
+from utils import apply_middlewares, exec_cached_script
 
 logger = logging.getLogger()
 
@@ -22,23 +22,37 @@ class HTTPJsonResource(resource.Resource):
     """
 
     def __init__(self, *args, **kwargs):
-        self.registry = static.Registry()
-        self.wwwroot = os.path.abspath(os.path.join("files", "wwwroot"))
-        self.routes = JsonRoutes(os.path.join("files", "routes", "http_*.json"))
-        self.middlewares = JsonRoutes(os.path.join("files", "middlewares", "http_*.json"))
+        self.filesroot = os.path.abspath(os.path.join("files"))
+        self.routes = JsonRoutes(protocol="http")
+        self.middlewares = JsonRoutes(protocol="http_middleware")
         super().__init__(*args, **kwargs)
 
     def getChild(self, name, request):
-        request_path = request.path.decode("UTF-8")
+        # Rebuild the request parts for route matching
+        scheme = "https" if request.isSecure() else "http"
+        host = request.getRequestHostname().decode("UTF-8") or "-"
+        port = request.getHost().port
+        path = request.path.decode("UTF-8")
+        args = (request.uri.decode("UTF-8").split("?", 1) + [""])[1]
+
+        request_path = path
+        request_parts = [request_path]
+        if args:
+            request_parts.append(request_path + "?" + args)
+
+        request_parts.append("{}://{}{}{}".format(
+            scheme,
+            host,
+            (":%d" % port) if port != {"http": 80, "https": 443}[scheme] else "",
+            request_parts[-1]
+        ))
 
         def _getChild(request):
             headers = {}
             resource_path = request_path
 
-            route_descriptor = self.routes.get_descriptor(request_path)
+            route_descriptor, route_match = self.routes.get_descriptor(*request_parts)
             if route_descriptor is not None:
-                logger.debug("Matched route {}".format(repr(route_descriptor)))
-
                 headers = route_descriptor.get("headers", {})
 
                 # Forward case
@@ -59,28 +73,33 @@ class HTTPJsonResource(resource.Resource):
                     return SimpleResource(request_path, code, headers=headers, body=body)
                 # Path case
                 elif "path" in route_descriptor:
-                    resource_path = re.sub(route_descriptor["route"], route_descriptor["path"], request_path)
+                    resource_path = route_descriptor["path"]
+                    # Replace regex groups in the route path
+                    for i, group in enumerate(re.search(route_descriptor["route"], route_match).groups()):
+                        if group is not None:
+                            resource_path = resource_path.replace("${}".format(i + 1), group)
 
-            # Prepend the resource_path with the wwwroot and canonicalize
-            resource_path = os.path.abspath(os.path.join(self.wwwroot, resource_path.lstrip("/")))
-            # Security: Ensure the absolute resource_path is within the wwwroot!
-            if resource_path.startswith(self.wwwroot):
-                if os.path.exists(resource_path):
-                    # Security: Don't show the soruce of python files!
-                    if os.path.splitext(resource_path)[1].lower() == ".py":
-                        try:
-                            return resource.IResource(script.ResourceScript(resource_path, self.registry))
-                        except Exception:
-                            logger.exception("Unahandled exception in exec'd file '{}'".format(resource_path))
-                    else:
-                        with open(resource_path, "r") as f:
-                            data = f.read()
-                        return SimpleResource(request_path, 200, headers=headers, body=data)
+                # Security: Ensure the absolute resource_path is within the wwwroot!
+                # Prepend the resource_path with the wwwroot and canonicalize
+                resource_path = os.path.abspath(os.path.join(self.filesroot, resource_path.lstrip("/")))
+                if resource_path.startswith(self.filesroot):
+                    if os.path.exists(resource_path):
+                        # Security: Don't show the soruce of python files!
+                        if os.path.splitext(resource_path)[1].lower() == ".py":
+                            try:
+                                res = exec_cached_script(resource_path)
+                                return resource.IResource(res["get_resource"](request))
+                            except Exception:
+                                logger.exception("Unahandled exception in exec'd file '{}'".format(resource_path))
+                        else:
+                            with open(resource_path, "r") as f:
+                                data = f.read()
+                            return SimpleResource(request_path, 200, headers=headers, body=data)
 
             # Default handling, 404 here
             return super().getChild(name, request)
 
-        return apply_middlewares(self.middlewares, request_path, _getChild)(request)
+        return apply_middlewares(self.middlewares.get_descriptors(*request_parts), _getChild)(request)
 
 
 class HTTPSite(server.Site):
@@ -128,7 +147,7 @@ class SSLContextFactory(ssl.ContextFactory):
         self.ctx = SSL.Context(SSL.TLSv1_METHOD)
         self.ctx.set_tlsext_servername_callback(self.pick_certificate)
         self.tls_ctx = None
-        self.middlewares = JsonRoutes(os.path.join("files", "middlewares", "ssl_*.json"))
+        self.middlewares = JsonRoutes(protocol="ssl_middleware")
 
         try:
             dk_path = os.path.join("files", "keys", "domain.key")
@@ -151,6 +170,6 @@ class SSLContextFactory(ssl.ContextFactory):
 
         # Apply middlewares
         server_name_indication = (connection.get_servername() or b'').decode("UTF-8")
-        ctx = apply_middlewares(self.middlewares, server_name_indication, _pick_certificate)(connection)
+        ctx = apply_middlewares(self.middlewares.get_descriptors(server_name_indication), _pick_certificate)(connection)
         if ctx is not None:
             connection.set_context(self.tls_ctx)

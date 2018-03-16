@@ -12,32 +12,37 @@ class JsonRoutes(object):
     """
     DEFAULT_SORT_KEY=lambda x: 100 if "default" in x else int(''.join(y for y in x if y.isdigit()) or 99)
 
-    def __init__(self, *args, key=None, **kwargs):
-        self.path_globs = list(args)
+    def __init__(self, *args, protocol=None, key=None, **kwargs):
+        self.path_globs = list(args) or [os.path.join("files", "routes", "*.json")]
+        self.protocol = protocol
+        self.key = key or JsonRoutes.DEFAULT_SORT_KEY
+        self.format_args = {k : re.escape(v) for k, v in kwargs.items()}
+
         self._cache = {}
         self.json_routes = {}
         self._route_descriptors = []
-        self.format_args = {k : re.escape(v) for k, v in kwargs.items()}
-        self.key = key or JsonRoutes.DEFAULT_SORT_KEY
 
     @property
     def route_descriptors(self):
         self._update_route_descriptors()
         return self._route_descriptors
 
-    def get_descriptor(self, route):
-        self._update_route_descriptors()
-        for route_descriptor in self._route_descriptors:
-            if re.fullmatch(route_descriptor["route"], route):
-                return route_descriptor
-        return None
+    def get_descriptor(self, *routes):
+        return (self.get_descriptors(*routes, first=True) or [(None, None)])[0]
 
-    def get_descriptors(self, route):
+    def get_descriptors(self, *routes, first=False):
         self._update_route_descriptors()
         descriptors = []
         for route_descriptor in self._route_descriptors:
-            if re.fullmatch(route_descriptor["route"], route):
-                descriptors.append(route_descriptor)
+            for route in routes:
+                if re.search(route_descriptor["route"], route):
+                    logger.debug("Matched route {}: {}".format(route, repr(route_descriptor)))
+                    descriptors.append((route_descriptor, route))
+                    if first:
+                        return descriptors
+
+                    # Only record the first matching route_descriptor for a set of routes
+                    break
         return descriptors
 
     def _update_route_descriptors(self):
@@ -49,7 +54,7 @@ class JsonRoutes(object):
                     if mtime > self._cache.get(rd_path, 0):
                         try:
                             with open(rd_path, "r") as f:
-                                route_descriptors = json.load(f)
+                                route_descriptors = [x for x in json.load(f) if x.get("protocol", None) == self.protocol]
                                 for route_descriptor in route_descriptors:
                                     # Cheating string format to avoid key errors with regex syntax, e.g. '[0-2]{1, 3}'
                                     for key, value in self.format_args.items():

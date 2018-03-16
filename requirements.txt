@@ -1,4 +1,5 @@
 twisted
 pyopenssl
+service_identity
 pycrypto
 httpbin

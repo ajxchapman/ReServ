@@ -69,7 +69,7 @@ class HTTPJsonResource(resource.Resource):
                 # Code case
                 elif "code" in route_descriptor:
                     code = route_descriptor.get("code", 200)
-                    body = route_descriptor.get("body", "")
+                    body = route_descriptor.get("body", "").encode("UTF-8")
                     return SimpleResource(request_path, code, headers=headers, body=body)
                 # Path case
                 elif "path" in route_descriptor:
@@ -92,7 +92,7 @@ class HTTPJsonResource(resource.Resource):
                             except Exception:
                                 logger.exception("Unahandled exception in exec'd file '{}'".format(resource_path))
                         else:
-                            with open(resource_path, "r") as f:
+                            with open(resource_path, "rb") as f:
                                 data = f.read()
                             return SimpleResource(request_path, 200, headers=headers, body=data)
 
@@ -172,4 +172,6 @@ class SSLContextFactory(ssl.ContextFactory):
         server_name_indication = (connection.get_servername() or b'').decode("UTF-8")
         ctx = apply_middlewares(self.middlewares.get_descriptors(server_name_indication), _pick_certificate)(connection)
         if ctx is not None:
+            connection.set_context(ctx)
+        else:
             connection.set_context(self.tls_ctx)

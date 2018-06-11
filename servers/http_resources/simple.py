@@ -31,4 +31,4 @@ class SimpleResource(resource.Resource):
         if len(self.body):
             if not "Content-Length" in self.headers:
                 request.setHeader("Content-Length".encode("UTF-8"), str(len(self.body)).encode("UTF-8"))
-        return self.body.encode("UTF-8")
+        return self.body

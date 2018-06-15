@@ -55,7 +55,7 @@ def exec_cached_script(path):
     if cache["mtime"] < os.path.getmtime(path):
         with open(path) as f:
             code = compile(f.read(), path, "exec")
-            _vars = {}
+            _vars = {"__file__": path}
             exec(code, _vars, _vars)
             cache["vars"] = _vars
             cache["mtime"] = os.path.getmtime(path)

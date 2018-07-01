@@ -12,9 +12,9 @@ logger = logging.getLogger()
 class DNSJsonServerFactory(server.DNSServerFactory):
     noisy = False
 
-    def __init__(self, domain, *args, **kwargs):
+    def __init__(self, domain, *args, ipv4_address=None, ipv6_address=None, **kwargs):
         self.middlewares = JsonRoutes(protocol="dns_middleware")
-        dns_client = clients.dns.DNSJsonClient(domain)
+        dns_client = clients.dns.DNSJsonClient(domain, ipv4_address=ipv4_address, ipv6_address=ipv6_address)
         super().__init__(*args, clients=[dns_client], **kwargs)
 
     def sendReply(self, protocol, message, address):

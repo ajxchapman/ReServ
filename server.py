@@ -30,12 +30,13 @@ logger.addHandler(file_handler)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="research servers")
-    parser.add_argument("domain_name", type=str,
-                        help="the root domain name for the DNS server")
+    parser.add_argument("--ipv4", type=str, default=None, help="the default ipv4 address to response with")
+    parser.add_argument("--ipv6", type=str, default=None, help="the default ipv6 address to response with")
+    parser.add_argument("domain_name", type=str, help="the root domain name for the DNS server")
 
     args = parser.parse_args()
 
-    dns_server_factory = servers.dns.DNSJsonServerFactory(args.domain_name)
+    dns_server_factory = servers.dns.DNSJsonServerFactory(args.domain_name, ipv4_address=args.ipv4, ipv6_address=args.ipv6)
     reactor.listenUDP(53, dns.DNSDatagramProtocol(dns_server_factory), interface="0.0.0.0")
     reactor.listenTCP(53, dns_server_factory, interface="0.0.0.0")
 

@@ -49,12 +49,20 @@ class DNSJsonClient(client.Resolver):
                     if lookup_type == rd_type:
                         logger.debug("Matched route {}".format(repr(route_descriptor)))
                         ttl = int(route_descriptor.get("ttl", "60"))
+                        record_type = lookup_type
+                        record_class = getattr(dns, "Record_" + rd_type_name, dns.UnknownRecord)
+
+                        # Determine the record type and record type class
+                        if "record" in route_descriptor:
+                            record_type = dns.REV_TYPES.get(route_descriptor["record"], 0)
+                            record_class = getattr(dns, "Record_" + route_descriptor["record"], dns.UnknownRecord)
 
                         # Obtain an array of responses
                         responses = [self.ipv6_address if rd_type_name == "AAAA" else self.ipv4_address]
                         if "response" in route_descriptor:
                             responses = route_descriptor["response"]
-                        elif "script" in route_descriptor:
+
+                        if "script" in route_descriptor:
                             try:
                                 args = route_descriptor.get("args", [])
                                 kwargs = route_descriptor.get("kwargs", {})
@@ -65,15 +73,6 @@ class DNSJsonClient(client.Resolver):
 
                         if isinstance(responses, str):
                             responses = [responses]
-
-                        # Determine the record type and record type class
-                        if "record" in route_descriptor:
-                            record_type = dns.REV_TYPES.get(route_descriptor["record"], 0)
-                            record_class = getattr(dns, "Record_" + route_descriptor["record"], dns.UnknownRecord)
-                        else:
-                            record_type = lookup_type
-                            record_class = getattr(dns, "Record_" + rd_type_name, dns.UnknownRecord)
-
                         for response in responses:
                             # Replace regex groups in the route path
                             for i, group in enumerate(re.search(route_descriptor["route"], str_lookup_name).groups()):

@@ -21,9 +21,9 @@ class HTTPJsonResource(resource.Resource):
     HTTP resource which serves response based on a JsonRoutes object
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, domain, *args, **kwargs):
         self.filesroot = os.path.abspath(os.path.join("files"))
-        self.routes = JsonRoutes(protocol="http")
+        self.routes = JsonRoutes(protocol="http", domain=domain)
         self.middlewares = JsonRoutes(protocol="http_middleware")
         super().__init__(*args, **kwargs)
 

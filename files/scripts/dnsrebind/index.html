@@ -1,0 +1,22 @@
+<html>
+<body>
+  <b>Enter the timeout, address and path for the dnsrebind target:</b>
+  <form action="#" onsubmit="onSubmit(); return false;">
+    <label for="timeout">Timeout: </label><input type="text" cols=8 name="timeout" id="timeout" value="20" /><br />
+    <label for="address">Address: </label><input type="text" cols=8 name="address" id="address" value="127.0.0.1" /><br />
+    <label for="port">Port: </label><input type="text" cols=8 name="port" id="port" value="80" /><br />
+    <label for="path">Path: </label><input type="text" cols=8 name="path" id="path" value="/" /><br />
+    <input type="submit" />
+  </form>
+  <script>
+  function onSubmit() {
+    console.log("onSubmit");
+    var timeout = document.getElementById("timeout").value;
+    var address = document.getElementById("address").value;
+    var port = document.getElementById("port").value;
+    var path = document.getElementById("path").value.replace("/", "", 1);
+    document.location =  `${document.location}rebind.html?timeout=${timeout}&address=${address}&port=${port}&path=${path}`;
+  }
+  </script>
+</body>
+</html>

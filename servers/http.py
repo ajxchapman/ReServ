@@ -83,7 +83,7 @@ class HTTPJsonResource(resource.Resource):
                 # Prepend the resource_path with the wwwroot and canonicalize
                 resource_path = os.path.abspath(os.path.join(self.filesroot, resource_path.lstrip("/")))
                 if resource_path.startswith(self.filesroot):
-                    if os.path.exists(resource_path):
+                    if os.path.isfile(resource_path):
                         # Security: Don't show the soruce of python files!
                         if os.path.splitext(resource_path)[1].lower() == ".py":
                             try:
@@ -97,7 +97,7 @@ class HTTPJsonResource(resource.Resource):
                             return SimpleResource(request_path, 200, headers=headers, body=data)
 
             # Default handling, 404 here
-            return super().getChild(name, request)
+            return SimpleResource(request_path, 404, body=b'Not Found')
 
         return apply_middlewares(self.middlewares.get_descriptors(*request_parts), _getChild)(request)
 

@@ -39,8 +39,12 @@ if __name__ == "__main__":
     dns_server_factory = servers.dns.DNSJsonServerFactory(args.domain_name, ipv4_address=args.ipv4, ipv6_address=args.ipv6)
     reactor.listenUDP(53, dns.DNSDatagramProtocol(dns_server_factory), interface="0.0.0.0")
     reactor.listenTCP(53, dns_server_factory, interface="0.0.0.0")
+    logger.info("DNSJsonServerFactory listening on port 53/udp")
+    logger.info("DNSJsonServerFactory listening on port 53/tcp")
 
     http_resource = servers.http.HTTPJsonResource(args.domain_name)
     reactor.listenTCP(80, servers.http.HTTPSite(http_resource), interface="0.0.0.0")
     reactor.listenSSL(443, servers.http.HTTPSite(http_resource), servers.http.SSLContextFactory(), interface="0.0.0.0")
+    logger.info("HTTPJsonResource listening on port 80/tcp")
+    logger.info("HTTPJsonResource listening on port 443/tcp")
     reactor.run()

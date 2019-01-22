@@ -94,6 +94,16 @@ class HTTPJsonResource(resource.Resource):
                         else:
                             with open(resource_path, "rb") as f:
                                 data = f.read()
+                            replace = route_descriptor.get("replace", [])
+                            if len(replace):
+                                data = data.decode()
+                                for replace_descriptor in replace:
+                                    replacement = replace_descriptor["replacement"]
+                                    replacement = replacement.replace("{hostname}", host)
+                                    replacement = replacement.replace("{port}", str(port))
+                                    replacement = replacement.replace("{path}", path)
+                                    data = re.sub(replace_descriptor["pattern"], replacement, data)
+                                data = data.encode()
                             return SimpleResource(request_path, 200, headers=headers, body=data)
 
             # Default handling, 404 here

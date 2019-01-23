@@ -36,13 +36,15 @@ class JsonRoutes(object):
         for route_descriptor in self._route_descriptors:
             for route in routes:
                 if re.search(route_descriptor["route"], route):
-                    logger.debug("Matched route {}: {}".format(route, repr(route_descriptor)))
+                    logger.debug("[!] Matched route {}: {}".format(route, repr(route_descriptor)))
                     descriptors.append((route_descriptor, route))
                     if first:
                         return descriptors
 
                     # Only record the first matching route_descriptor for a set of routes
                     break
+                else:
+                    logger.debug("[-] Checked route {}: {}".format(route, repr(route_descriptor)))
         return descriptors
 
     def _update_route_descriptors(self):

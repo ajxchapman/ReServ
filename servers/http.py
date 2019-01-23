@@ -105,6 +105,8 @@ class HTTPJsonResource(resource.Resource):
                                     data = re.sub(replace_descriptor["pattern"], replacement, data)
                                 data = data.encode()
                             return SimpleResource(request_path, 200, headers=headers, body=data)
+                    else:
+                        logger.debug("File not found '{}'".format(resource_path))
 
             # Default handling, 404 here
             return SimpleResource(request_path, 404, body=b'Not Found')

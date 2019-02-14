@@ -6,14 +6,31 @@ import os
 logger = logging.getLogger()
 
 
-def get_ipv4_address(dest="8.8.8.8"):
+def get_ipv4_address(dest="8.8.8.8", port=80):
+    """
+    Get ipv4 address for a given destination. By default use Google's ipv4 DNS
+    assress.
+    """
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.connect((dest, 80))
-    return s.getsockname()[0]
+    try:
+        s.connect((dest, port))
+        return s.getsockname()[0]
+    except OSError:
+        pass
+    return "127.0.0.1"
 
 
-def get_ipv6_address(dest="::1"):
-    # TODO
+def get_ipv6_address(dest="2001:4860:4860::8888", port=80):
+    """
+    Get ipv6 address for a given destination. By default use Google's ipv6 DNS
+    assress.
+    """
+    s = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+    try:
+        s.connect((dest, port))
+        return s.getsockname()[0]
+    except OSError:
+        pass
     return "::1"
 
 

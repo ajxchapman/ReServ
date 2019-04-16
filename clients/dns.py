@@ -1,3 +1,4 @@
+import inspect
 import logging
 import os
 import re
@@ -9,6 +10,42 @@ from jsonroutes import JsonRoutes
 from utils import get_ipv4_address, get_ipv6_address, exec_cached_script
 
 logger = logging.getLogger()
+
+# Shim classes for DNS records that twisted does not support
+record_classes = {k.split("_", 1)[1] : v for k,v in inspect.getmembers(dns, lambda x: inspect.isclass(x) and x.__name__.startswith("Record_"))}
+
+class Record_CAA:
+    """
+    The Certification Authority Authorization record.
+    """
+    TYPE = 257
+    fancybasename = 'CAA'
+
+    def __init__(self, record, ttl=None):
+        record = record.split(b' ', 2)
+        self.flags = int(record[0])
+        self.tag = record[1]
+        self.value = record[2].replace(b'"', b'')
+        self.ttl = dns.str2time(ttl)
+
+    def encode(self, strio, compDict = None):
+        strio.write(bytes([self.flags, len(self.tag)]))
+        strio.write(self.tag)
+        strio.write(self.value)
+
+    def decode(self, strio, length = None):
+        pass
+
+    def __hash__(self):
+        return hash(self.address)
+
+    def __str__(self):
+        return '<CAA record=%d %s "%s" ttl=%s>' % (self.flags, self.tag.decode(), self.value.decode(), self.ttl)
+    __repr__ = __str__
+
+dns.QUERY_TYPES[Record_CAA.TYPE] = Record_CAA.fancybasename
+dns.REV_TYPES[Record_CAA.fancybasename] = Record_CAA.TYPE
+record_classes[Record_CAA.fancybasename] = Record_CAA
 
 class DNSJsonClient(client.Resolver):
     """
@@ -50,12 +87,12 @@ class DNSJsonClient(client.Resolver):
                         logger.debug("Matched route {}".format(repr(route_descriptor)))
                         ttl = int(route_descriptor.get("ttl", "60"))
                         record_type = lookup_type
-                        record_class = getattr(dns, "Record_" + rd_type_name, dns.UnknownRecord)
+                        record_class = record_classes.get(rd_type_name, dns.UnknownRecord)
 
                         # Determine the record type and record type class
                         if "record" in route_descriptor:
                             record_type = dns.REV_TYPES.get(route_descriptor["record"], 0)
-                            record_class = getattr(dns, "Record_" + route_descriptor["record"], dns.UnknownRecord)
+                            record_class = record_classes.get(route_descriptor["record"], dns.UnknownRecord)
 
                         # Obtain an array of responses
                         responses = [self.ipv6_address if rd_type_name == "AAAA" else self.ipv4_address]

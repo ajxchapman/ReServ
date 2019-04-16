@@ -4,5 +4,11 @@
     "route" : "_acme-challenge\\.{domain}",
     "type" : "TXT",
     "response" : ["Challenge1 Response", "Challenge2 Response"]
+  },
+  {
+    "protocol" : "dns",
+    "route" : ".*{domain}$",
+    "type" : "CAA",
+    "response" : "0 issue \"letsencrypt.org\""
   }
 ]

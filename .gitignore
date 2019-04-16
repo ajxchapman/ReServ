@@ -5,3 +5,4 @@ __pycache__/
 .ropeproject/
 files/keys/
 files/logs/
+venv/

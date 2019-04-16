@@ -161,17 +161,16 @@ class SSLContextFactory(ssl.ContextFactory):
         self.tls_ctx = None
         self.middlewares = JsonRoutes(protocol="ssl_middleware")
 
-        try:
-            dk_path = os.path.join("files", "keys", "domain.key")
-            dc_path = os.path.join("files", "keys", "domain.crt")
-            if os.path.exists(dk_path) and os.path.exists(dc_path):
-                ctx = SSL.Context(SSL.TLSv1_METHOD)
-                ctx.use_privatekey_file(dk_path)
-                ctx.use_certificate_file(dc_path)
-                ctx.use_certificate_chain_file(dc_path)
-                self.tls_ctx = ctx
-        except Exception:
-            logger.exception("Unable to load TLS certificate information")
+        dk_path = os.path.join("files", "keys", "domain.key")
+        dc_path = os.path.join("files", "keys", "domain.crt")
+        if os.path.exists(dk_path) and os.path.exists(dc_path):
+            ctx = SSL.Context(SSL.TLSv1_METHOD)
+            ctx.use_privatekey_file(dk_path)
+            ctx.use_certificate_file(dc_path)
+            ctx.use_certificate_chain_file(dc_path)
+            self.tls_ctx = ctx
+        else:
+            raise Exception("Unable to load TLS certificate information")
 
     def getContext(self):
         return self.ctx

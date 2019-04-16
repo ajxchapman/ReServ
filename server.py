@@ -57,9 +57,13 @@ if __name__ == "__main__":
 
         http_resource = servers.http.HTTPJsonResource(args.domain_name)
         reactor.listenTCP(80, servers.http.HTTPSite(http_resource), interface="0.0.0.0")
-        reactor.listenSSL(443, servers.http.HTTPSite(http_resource), servers.http.SSLContextFactory(), interface="0.0.0.0")
         logger.info("HTTPJsonResource listening on port 80/tcp")
-        logger.info("HTTPJsonResource listening on port 443/tcp")
+
+        try:
+            reactor.listenSSL(443, servers.http.HTTPSite(http_resource), servers.http.SSLContextFactory(), interface="0.0.0.0")
+            logger.info("HTTPJsonResource listening on port 443/tcp")
+        except:
+            logger.exception("Unable to start TLS server")
         reactor.run()
     elif args.command == "route":
         from jsonroutes import JsonRoutes

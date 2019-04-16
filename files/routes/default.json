@@ -37,7 +37,11 @@
     "protocol" : "http",
     "route" : "^/static/(.*)",
     "path" : "./wwwroot/$1",
-    "comment" : "Rule for serving files under /files"
+    "headers" : {
+      "Access-Control-Allow-Origin" : "*",
+      "Referrer-Policy" : "unsafe-url"
+    },
+    "comment" : "Rule for serving files under /static"
   },
   {
     "protocol" : "http",

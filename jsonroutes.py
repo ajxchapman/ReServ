@@ -21,6 +21,7 @@ class JsonRoutes(object):
         self._cache = {}
         self.json_routes = {}
         self._route_descriptors = []
+        self._update_route_descriptors()
 
     @property
     def route_descriptors(self):
@@ -56,7 +57,7 @@ class JsonRoutes(object):
                     if mtime > self._cache.get(rd_path, 0):
                         try:
                             with open(rd_path, "r") as f:
-                                route_descriptors = [x for x in json.load(f) if x.get("protocol", None) == self.protocol]
+                                route_descriptors = [x for x in json.load(f) if self.protocol is None or x.get("protocol", None) == self.protocol]
                                 for route_descriptor in route_descriptors:
                                     # Cheating string format to avoid key errors with regex syntax, e.g. '[0-2]{1, 3}'
                                     for key, value in self.format_args.items():

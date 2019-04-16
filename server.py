@@ -4,11 +4,12 @@ import os
 import sys
 import argparse
 
-from twisted.internet import reactor
-from twisted.names import dns
+usage = """python research_servers.py <command> [<args>]
 
-import servers.dns
-import servers.http
+Available commands are:
+   start      Start the configured servers
+   route      Test route matches
+"""
 
 # Make sure our working directory is sane
 os.chdir(os.path.split(os.path.abspath(__file__))[0])
@@ -29,22 +30,64 @@ logger.addHandler(file_handler)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="research servers")
-    parser.add_argument("--ipv4", type=str, default=None, help="the default ipv4 address to response with")
-    parser.add_argument("--ipv6", type=str, default=None, help="the default ipv6 address to response with")
-    parser.add_argument("domain_name", type=str, help="the root domain name for the DNS server")
+    cmdline = sys.argv[1::]
+    parser = argparse.ArgumentParser(description="research servers", usage=usage)
+    parser.add_argument("command", help="Subcommand to run")
+    args = parser.parse_args(cmdline[0:1])
+    cmdline.pop(0)
 
-    args = parser.parse_args()
+    if args.command == "start":
+        from twisted.internet import reactor
+        from twisted.names import dns
 
-    dns_server_factory = servers.dns.DNSJsonServerFactory(args.domain_name, ipv4_address=args.ipv4, ipv6_address=args.ipv6)
-    reactor.listenUDP(53, dns.DNSDatagramProtocol(dns_server_factory), interface="0.0.0.0")
-    reactor.listenTCP(53, dns_server_factory, interface="0.0.0.0")
-    logger.info("DNSJsonServerFactory listening on port 53/udp")
-    logger.info("DNSJsonServerFactory listening on port 53/tcp")
+        import servers.dns
+        import servers.http
 
-    http_resource = servers.http.HTTPJsonResource(args.domain_name)
-    reactor.listenTCP(80, servers.http.HTTPSite(http_resource), interface="0.0.0.0")
-    reactor.listenSSL(443, servers.http.HTTPSite(http_resource), servers.http.SSLContextFactory(), interface="0.0.0.0")
-    logger.info("HTTPJsonResource listening on port 80/tcp")
-    logger.info("HTTPJsonResource listening on port 443/tcp")
-    reactor.run()
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--ipv4", type=str, default=None, help="the default ipv4 address to response with")
+        parser.add_argument("--ipv6", type=str, default=None, help="the default ipv6 address to response with")
+        parser.add_argument("domain_name", type=str, default=None, help="the root domain name for the DNS server")
+        args = parser.parse_args(cmdline)
+
+        dns_server_factory = servers.dns.DNSJsonServerFactory(args.domain_name, ipv4_address=args.ipv4, ipv6_address=args.ipv6)
+        reactor.listenUDP(53, dns.DNSDatagramProtocol(dns_server_factory), interface="0.0.0.0")
+        reactor.listenTCP(53, dns_server_factory, interface="0.0.0.0")
+        logger.info("DNSJsonServerFactory listening on port 53/udp")
+        logger.info("DNSJsonServerFactory listening on port 53/tcp")
+
+        http_resource = servers.http.HTTPJsonResource(args.domain_name)
+        reactor.listenTCP(80, servers.http.HTTPSite(http_resource), interface="0.0.0.0")
+        reactor.listenSSL(443, servers.http.HTTPSite(http_resource), servers.http.SSLContextFactory(), interface="0.0.0.0")
+        logger.info("HTTPJsonResource listening on port 80/tcp")
+        logger.info("HTTPJsonResource listening on port 443/tcp")
+        reactor.run()
+    elif args.command == "route":
+        from jsonroutes import JsonRoutes
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--protocol", "-p", type=str, default=None, help="the route protocol to test [dns, http, dns_middleware, http_middleware, ssl_middleware]")
+        parser.add_argument("--domain", "-d", type=str, default="example.com", help="the root domain name for this server")
+        parser.add_argument("--full", "-f", default=False, action="store_true", help="show the full matching route definition")
+        parser.add_argument("route", type=str, default=None, help="the route to match")
+        args = parser.parse_args(cmdline)
+
+        routes = JsonRoutes(protocol=args.protocol, domain=args.domain)
+        route_files = sorted(routes.json_routes.keys(), key=routes.key)
+        for i, route in enumerate(routes.get_descriptors(args.route)):
+            route = route[0]
+            # Get the file the route is defined in, this is a bit of a hack
+            definition_file = None
+            for x in route_files:
+                if route in routes.json_routes[x]:
+                    definition_file = x
+                    break
+
+            print("!" if i == 0 else " ", end="")
+            if args.full:
+                print("[{}] {}:\n\t{}".format(i, definition_file, repr(route)))
+            else:
+                print("[{}] {}: {}".format(i, definition_file, route["route"]))
+    else:
+        print("Unrecognized command '{}'".format(command), file=sys.stderr)
+        parser.print_help()
+        sys.exit(1)

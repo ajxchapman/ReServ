@@ -1,6 +1,7 @@
 import inspect
 import logging
 import os
+import random
 import re
 
 from twisted.internet import reactor
@@ -110,7 +111,7 @@ class DNSJsonClient(client.Resolver):
 
                         if isinstance(responses, str):
                             responses = [responses]
-                        for response in responses:
+                        for response in responses if not route_descriptor.get("random", False) else [random.choice(responses)]:
                             # Replace regex groups in the route path
                             for i, group in enumerate(re.search(route_descriptor["route"], str_lookup_name).groups()):
                                 if group is not None:

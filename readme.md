@@ -16,7 +16,7 @@ Default configuration includes examples for DNS Rebinding attacks ([files/routes
 # Usage
 In order to start the servers use the following command:
 ```bash
-$ python3 server.py <domain>
+$ python3 server.py start <domain>
 ```
 
 In order to enable HTTPS connections certificate and key files must be generated and stored at `files/keys/domain.crt` and `files/keys/domain.key` respectively.

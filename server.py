@@ -4,7 +4,7 @@ import os
 import sys
 import argparse
 
-usage = """python research_servers.py <command> [<args>]
+usage = """python3 server.py <command> [<args>]
 
 Available commands are:
    start      Start the configured servers

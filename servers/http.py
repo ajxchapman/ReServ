@@ -102,6 +102,7 @@ class HTTPJsonResource(resource.Resource):
                                     replacement = replacement.replace("{hostname}", host)
                                     replacement = replacement.replace("{port}", str(port))
                                     replacement = replacement.replace("{path}", path)
+                                    replacement = replacement.replace("{scheme}", scheme)
                                     data = re.sub(replace_descriptor["pattern"], replacement, data)
                                 data = data.encode()
                             return SimpleResource(request_path, 200, headers=headers, body=data)

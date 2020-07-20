@@ -10,7 +10,7 @@ class JsonRoutes(object):
     """
     Helper class to watch a set of JSON files and reload any that have changed.
     """
-    DEFAULT_SORT_KEY=lambda x: 100 if "default" in x else int(''.join(y for y in x if y.isdigit()) or 99)
+    DEFAULT_SORT_KEY=lambda x: 100 if os.path.basename(x).startswith("default") else int((re.findall("^[0-9]+", os.path.basename(x)) + ["99"])[0])
 
     def __init__(self, *args, protocol=None, key=None, **kwargs):
         self.path_globs = list(args) or [os.path.join("files", "routes", "*.json")]

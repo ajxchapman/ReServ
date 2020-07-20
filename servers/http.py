@@ -83,6 +83,7 @@ class HTTPJsonResource(resource.Resource):
                 # Prepend the resource_path with the wwwroot and canonicalize
                 resource_path = os.path.abspath(os.path.join(self.filesroot, resource_path.lstrip("/")))
                 if resource_path.startswith(self.filesroot):
+                    # First check if an exact match to the resource_path exists
                     if os.path.isfile(resource_path):
                         # Security: Don't show the soruce of python files!
                         if os.path.splitext(resource_path)[1].lower() == ".py":
@@ -106,6 +107,20 @@ class HTTPJsonResource(resource.Resource):
                                 data = data.encode()
                             return SimpleResource(request_path, 200, headers=headers, body=data)
                     else:
+                        # Then search for an `index.py` in each resource_path directory
+                        current_dir = self.filesroot
+                        search_dirs = [""] + resource_path.replace(self.filesroot, "").strip("/").split("/")
+                        for dir in search_dirs:
+                            current_dir = os.path.join(current_dir, dir)
+                            if os.path.isfile(os.path.join(current_dir, "index.py")):
+                                resource_path = os.path.join(current_dir, "index.py")
+                                try:
+                                    res = exec_cached_script(resource_path)
+                                    return resource.IResource(res["get_resource"](request))
+                                except Exception:
+                                    logger.exception("Unahandled exception in exec'd file '{}'".format(resource_path))
+                                    break
+
                         logger.debug("File not found '{}'".format(resource_path))
 
             # Default handling, 404 here

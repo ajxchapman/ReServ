@@ -172,7 +172,7 @@ class SSLContextFactory(ssl.ContextFactory):
     """
 
     def __init__(self):
-        self.ctx = SSL.Context(SSL.TLSv1_METHOD)
+        self.ctx = SSL.Context(SSL.TLSv1_2_METHOD)
         self.ctx.set_tlsext_servername_callback(self.pick_certificate)
         self.tls_ctx = None
         self.middlewares = JsonRoutes(protocol="ssl_middleware")

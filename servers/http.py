@@ -83,8 +83,8 @@ class HTTPJsonResource(resource.Resource):
                         if group is not None:
                             resource_path = resource_path.replace("${}".format(i + 1), group)
 
-                # Security: Ensure the absolute resource_path is within the wwwroot!
-                # Prepend the resource_path with the wwwroot and canonicalize
+                # Security: Ensure the absolute resource_path is within the `self.filesroot` directory!
+                # Prepend the resource_path with the self.filesroot and canonicalize
                 resource_path = os.path.abspath(os.path.join(self.filesroot, resource_path.lstrip("/")))
                 if resource_path.startswith(self.filesroot):
                     # First check if an exact match to the resource_path exists

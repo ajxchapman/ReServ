@@ -5,8 +5,10 @@ import urllib
 
 from OpenSSL import SSL
 
+from twisted.internet import reactor
 from twisted.internet import ssl
 from twisted.web import http, server, resource
+from twisted.web.wsgi import WSGIResource
 
 from jsonroutes import JsonRoutes
 from servers.http_resources.simple import SimpleResource
@@ -87,14 +89,27 @@ class HTTPJsonResource(resource.Resource):
                 # Prepend the resource_path with the self.filesroot and canonicalize
                 resource_path = os.path.abspath(os.path.join(self.filesroot, resource_path.lstrip("/")))
                 if resource_path.startswith(self.filesroot):
-                    # First check if an exact match to the resource_path exists
+                    # If the resource_path does not exist, or is a directory, search for an index.py in each url path directory
+                    if not os.path.isfile(resource_path):
+                        search_dirs = [""] + resource_path.replace(self.filesroot, "").strip("/").split("/")
+                        current_dir = self.filesroot
+                        for search_dir in search_dirs:
+                            current_dir = os.path.join(current_dir, search_dir)
+                            if os.path.isfile(os.path.join(current_dir, "index.py")):
+                                resource_path = os.path.join(current_dir, "index.py")
+
+                    # If the resource_path exists and is a file
                     if os.path.isfile(resource_path):
-                        # Security: Don't show the soruce of python files!
+                        # Execute python scripts
                         if os.path.splitext(resource_path)[1].lower() == ".py":
                             try:
                                 res = exec_cached_script(resource_path)
+                                # If the script exports an `app` variable, load it as a WSGI resource
+                                if "app" in res:
+                                    return WSGIResource(reactor, reactor.getThreadPool(), res["app"])
                                 return resource.IResource(res["get_resource"](request))
-                            except Exception:
+                            except:
+                                # Catch all exceptions and log them
                                 logger.exception("Unahandled exception in exec'd file '{}'".format(resource_path))
                         else:
                             with open(resource_path, "rb") as f:
@@ -111,20 +126,6 @@ class HTTPJsonResource(resource.Resource):
                                     data = re.sub(replace_descriptor["pattern"], replacement, data)
                                 data = data.encode()
                             return SimpleResource(request_path, 200, headers=headers, body=data)
-                    else:
-                        # Then search for an `index.py` in each resource_path directory
-                        current_dir = self.filesroot
-                        search_dirs = [""] + resource_path.replace(self.filesroot, "").strip("/").split("/")
-                        for dir in search_dirs:
-                            current_dir = os.path.join(current_dir, dir)
-                            if os.path.isfile(os.path.join(current_dir, "index.py")):
-                                resource_path = os.path.join(current_dir, "index.py")
-                                try:
-                                    res = exec_cached_script(resource_path)
-                                    return resource.IResource(res["get_resource"](request))
-                                except Exception:
-                                    logger.exception("Unahandled exception in exec'd file '{}'".format(resource_path))
-                                    break
 
                         logger.debug("File not found '{}'".format(resource_path))
 

@@ -57,12 +57,12 @@ class JsonRoutes(object):
                     if mtime > self._cache.get(rd_path, 0):
                         try:
                             with open(rd_path, "r") as f:
-                                default_sort_key = self.key_func(rd_path)
+                                default_sort_index = self.key_func(rd_path)
                                 route_descriptors = [x for x in json.load(f) if self.protocol is None or x.get("protocol", None) == self.protocol]
                                 for route_descriptor in route_descriptors:
                                     # Apply default keys and expand placeholders
-                                    if not "sort_key" in route_descriptor:
-                                        route_descriptor["sort_key"] = default_sort_key
+                                    if not "sort_index" in route_descriptor:
+                                        route_descriptor["sort_index"] = default_sort_index
                                     # Cheating string format to avoid key errors with regex syntax, e.g. '[0-2]{1, 3}'
                                     for key, value in self.format_args.items():
                                         route_descriptor["route"] = route_descriptor["route"].replace("{" + key + "}", value)
@@ -81,4 +81,4 @@ class JsonRoutes(object):
             for route_descriptors in self.json_routes:
                 for route_descriptor in route_descriptors:
                     self._route_descriptors.append(route_descriptor)
-            self._route_descriptors = sorted(self._route_descriptors, key=lambda x: x.sort_key)
+            self._route_descriptors = sorted(self._route_descriptors, key=lambda x: x["sort_index"])

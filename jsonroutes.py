@@ -14,7 +14,7 @@ class JsonRoutes(object):
     DEFAULT_SORT_KEY=lambda x: 100 if os.path.basename(x).startswith("default") else int((re.findall("^[0-9]+", os.path.basename(x)) + ["99"])[0])
 
     def __init__(self, *args, protocol=None, key_func=None, cache_invalidate_time=60, **kwargs):
-        self.path_globs = list(args) or [os.path.join("files", "routes", "*.json")]
+        self.path_globs = list(args) or [os.path.join("files", "routes", "**", "*.json"), os.path.join("files", "scripts", "**", "*.json"), os.path.join("files", "wwwroot", "**", "*.json")]
         self.protocol = protocol
         self.key_func = key_func or JsonRoutes.DEFAULT_SORT_KEY
         self.cache_invalidate_time = cache_invalidate_time

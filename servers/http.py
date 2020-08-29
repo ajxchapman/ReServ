@@ -185,7 +185,7 @@ class SSLContextFactory(ssl.ContextFactory):
         dk_path = os.path.join("files", "keys", "domain.key")
         dc_path = os.path.join("files", "keys", "domain.crt")
         if os.path.exists(dk_path) and os.path.exists(dc_path):
-            ctx = SSL.Context(SSL.TLSv1_METHOD)
+            ctx = SSL.Context(SSL.TLSv1_2_METHOD)
             ctx.use_privatekey_file(dk_path)
             ctx.use_certificate_file(dc_path)
             ctx.use_certificate_chain_file(dc_path)

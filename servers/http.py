@@ -41,11 +41,12 @@ class HTTPJsonResource(resource.Resource):
         request_path = path
         request_parts = []
         
-        request_parts.append("{}://{}{}{}".format(
-            scheme,
-            host,
-            (":%d" % port) if port != {"http": 80, "https": 443}[scheme] else "",
-            request_parts[-1]
+        request_parts.append("{scheme}://{host}{port}{path}{args}".format(
+            scheme=scheme,
+            host=host,
+            port=(":%d" % port) if port != {"http": 80, "https": 443}[scheme] else "",
+            path=request_path,
+            args= "?" + args if args else ""
         ))
 
         if args:

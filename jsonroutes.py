@@ -83,7 +83,7 @@ class JsonRoutes(object):
             # If we updated any route descriptors re-sort the internal list
             if updated:
                 self._route_descriptors = []
-                for route_descriptors in self.json_routes:
+                for route_descriptors in self.json_routes.values():
                     for route_descriptor in route_descriptors:
                         self._route_descriptors.append(route_descriptor)
                 self._route_descriptors = sorted(self._route_descriptors, key=lambda x: x["sort_index"])

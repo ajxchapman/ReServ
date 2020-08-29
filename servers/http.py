@@ -35,17 +35,21 @@ class HTTPJsonResource(resource.Resource):
         path = request.path.decode("UTF-8")
         args = (request.uri.decode("UTF-8").split("?", 1) + [""])[1]
 
+        # Match on any of scheme://host(:port)/path?args, /path?args, /path in that order
         request_path = path
-        request_parts = [request_path]
-        if args:
-            request_parts.append(request_path + "?" + args)
-
+        request_parts = []
+        
         request_parts.append("{}://{}{}{}".format(
             scheme,
             host,
             (":%d" % port) if port != {"http": 80, "https": 443}[scheme] else "",
             request_parts[-1]
         ))
+
+        if args:
+            request_parts.append(request_path + "?" + args)
+
+        request_parts.append(request_path)
 
         def _getChild(request):
             headers = {}

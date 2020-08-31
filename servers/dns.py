@@ -114,7 +114,7 @@ class DNSJsonServerFactory(server.DNSServerFactory):
                 kwargs = route_descriptor.get("kwargs", {})
                 get_record = exec_cached_script(route_descriptor["script"])["get_record"]
                 responses = get_record(qname, lookup_cls, qtype, *args, **kwargs)
-            except Exception as e:
+            except:
                 logger.exception("Error executing script {}".format(route_descriptor["script"]))
 
         # Coerce the response into a list

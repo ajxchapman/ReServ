@@ -39,7 +39,8 @@ class JsonRoutes(object):
         descriptors = []
         for route_descriptor in self._route_descriptors:
             for route in routes:
-                if re.search(route_descriptor["route"], route):
+                # A route_descriptor without a route will match all routes
+                if "route" not in route_descriptor or re.search(route_descriptor["route"], route):
                     logger.debug("[!] Matched route {}: {}".format(route, repr(route_descriptor)))
                     descriptors.append((route_descriptor, route))
                     if first:

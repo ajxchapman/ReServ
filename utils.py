@@ -62,7 +62,7 @@ def apply_middlewares(routes, next_function):
         _args = middleware.get("args", [])
         _kwargs = middleware.get("kwargs", {})
 
-        _func = (lambda m, f, a, k: lambda r: m(r, f, *a, **k))(_middleware_func, _func, _args, _kwargs)
+        _func = (lambda m, f, a, k: lambda *args, **kwargs: m(f, *[*args, *a], **{**kwargs, **k}))(_middleware_func, _func, _args, _kwargs)
     return _func
 
 script_cache = {}

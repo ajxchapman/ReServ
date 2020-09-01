@@ -7,7 +7,7 @@ import re
 from twisted.names import dns, server
 
 from jsonroutes import JsonRoutes
-from utils import apply_middlewares, get_ipv4_address, get_ipv6_address, exec_cached_script
+import utils
 
 logger = logging.getLogger()
 
@@ -51,12 +51,11 @@ record_classes[Record_CAA.fancybasename] = Record_CAA
 class DNSJsonServerFactory(server.DNSServerFactory):
     noisy = False
 
-    def __init__(self, domain, *args, ipv4_address=None, ipv6_address=None, **kwargs):
-        self.middlewares = JsonRoutes()
-        self.ipv4_address = ipv4_address or get_ipv4_address()
-        self.ipv6_address = ipv6_address or get_ipv6_address()
-        self.routes = JsonRoutes(protocol="dns", domain=domain)
-        self.replace_args = {"domain": domain, "ipv4": self.ipv4_address, "ipv6": self.ipv6_address}
+    def __init__(self, *args, **kwargs):
+        self.routes = utils.get_routes()
+        self.ipv4_address = utils.get_variables().get("ipv4_address", utils.get_ipv4_address())
+        self.ipv6_address = utils.get_variables().get("ipv6_address", utils.get_ipv6_address())
+        
         super().__init__(*args, **kwargs)
 
     def sendReply(self, protocol, message, address):
@@ -112,7 +111,7 @@ class DNSJsonServerFactory(server.DNSServerFactory):
             try:
                 args = route_descriptor.get("args", [])
                 kwargs = route_descriptor.get("kwargs", {})
-                get_record = exec_cached_script(route_descriptor["script"])["get_record"]
+                get_record = utils.exec_cached_script(route_descriptor["script"])["get_record"]
                 responses = get_record(qname, lookup_cls, qtype, *args, **kwargs)
             except:
                 logger.exception("Error executing script {}".format(route_descriptor["script"]))
@@ -125,7 +124,9 @@ class DNSJsonServerFactory(server.DNSServerFactory):
             for i, group in enumerate(re.search(route_descriptor["route"], qname).groups()):
                 if group is not None:
                     response = response.replace("${}".format(i + 1), group)
-            response = response.format(**self.replace_args).encode()
+            
+            # Allow for dynamic routes, e.g. returned by scripts, to include variables
+            response = self.routes.replace_variables(response).encode()
             records.append((qname, record_type, lookup_cls, ttl, record_class(response, ttl=ttl)))
 
         if len(records):
@@ -166,5 +167,5 @@ class DNSJsonServerFactory(server.DNSServerFactory):
                     route_descriptor = _route_descriptor
                     break
 
-        middlewares = self.middlewares.get_descriptors(qname, rfilter=lambda x: x.get("protocol") == "dns_middleware")
-        return apply_middlewares(middlewares, _handleQuery)(route_descriptor, qname, lookup_cls, query.type, message, protocol, address)
+        middlewares = self.routes.get_descriptors(qname, rfilter=lambda x: x.get("protocol") == "dns_middleware")
+        return utils.apply_middlewares(middlewares, _handleQuery)(route_descriptor, qname, lookup_cls, query.type, message, protocol, address)

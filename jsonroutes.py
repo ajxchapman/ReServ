@@ -13,9 +13,8 @@ class JsonRoutes(object):
     """
     DEFAULT_SORT_KEY=lambda x: 100 if os.path.basename(x).startswith("default") else int((re.findall("^[0-9]+", os.path.basename(x)) + ["99"])[0])
 
-    def __init__(self, *args, protocol=None, key_func=None, cache_invalidate_time=60, **kwargs):
-        self.path_globs = list(args) or [os.path.join("files", "routes", "**", "*.json"), os.path.join("files", "scripts", "**", "*.json"), os.path.join("files", "wwwroot", "**", "*.json")]
-        self.protocol = protocol
+    def __init__(self, *args, key_func=None, cache_invalidate_time=60, **kwargs):
+        self.path_globs = list(args) or [os.path.join("files", "routes", "**", "*.json"), os.path.join("files", "scripts", "**", "*routes.json"), os.path.join("files", "wwwroot", "**", "*routes.json")]
         self.key_func = key_func or JsonRoutes.DEFAULT_SORT_KEY
         self.cache_invalidate_time = cache_invalidate_time
         self.format_args = {k : re.escape(v) for k, v in kwargs.items()}
@@ -31,16 +30,16 @@ class JsonRoutes(object):
         self._update_route_descriptors()
         return self._route_descriptors
 
-    def get_descriptor(self, *routes):
-        return (self.get_descriptors(*routes, first=True) or [(None, None)])[0]
+    def get_descriptor(self, *routes, rfilter=lambda x: True):
+        return (self.get_descriptors(*routes, rfilter=rfilter, first=True) or [(None, None)])[0]
 
-    def get_descriptors(self, *routes, first=False):
+    def get_descriptors(self, *routes, rfilter=lambda x: True, first=False):
         self._update_route_descriptors()
         descriptors = []
         for route_descriptor in self._route_descriptors:
             for route in routes:
                 # A route_descriptor without a route will match all routes
-                if "route" not in route_descriptor or re.search(route_descriptor["route"], route):
+                if ("route" not in route_descriptor or re.search(route_descriptor["route"], route)) and rfilter(route_descriptor):
                     logger.debug("[!] Matched route {}: {}".format(route, repr(route_descriptor)))
                     descriptors.append((route_descriptor, route))
                     if first:
@@ -64,16 +63,17 @@ class JsonRoutes(object):
                             try:
                                 with open(rd_path, "r") as f:
                                     default_sort_index = self.key_func(rd_path)
-                                    route_descriptors = [x for x in json.load(f) if self.protocol is None or x.get("protocol", None) == self.protocol]
+                                    route_descriptors = json.load(f)
                                     for route_descriptor in route_descriptors:
                                         # Apply default keys and expand placeholders
                                         if not "sort_index" in route_descriptor:
                                             route_descriptor["sort_index"] = default_sort_index
                                         # Cheating string format to avoid key errors with regex syntax, e.g. '[0-2]{1, 3}'
-                                        for key, value in self.format_args.items():
-                                            route_descriptor["route"] = route_descriptor["route"].replace("{" + key + "}", value)
-                                        # Compile regular expressions for speed
-                                        route_descriptor["route"] = re.compile(route_descriptor["route"])
+                                        if "route" in route_descriptor:
+                                            for key, value in self.format_args.items():
+                                                route_descriptor["route"] = route_descriptor["route"].replace("{" + key + "}", value)
+                                            # Compile regular expressions for speed
+                                            route_descriptor["route"] = re.compile(route_descriptor["route"])
                             except:
                                 logger.exception("Unable to parse json rule file '{}'".format(rd_path))
                             else:

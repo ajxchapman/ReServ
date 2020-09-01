@@ -52,7 +52,7 @@ class DNSJsonServerFactory(server.DNSServerFactory):
     noisy = False
 
     def __init__(self, domain, *args, ipv4_address=None, ipv6_address=None, **kwargs):
-        self.middlewares = JsonRoutes(protocol="dns_middleware")
+        self.middlewares = JsonRoutes()
         self.ipv4_address = ipv4_address or get_ipv4_address()
         self.ipv6_address = ipv6_address or get_ipv6_address()
         self.routes = JsonRoutes(protocol="dns", domain=domain)
@@ -152,19 +152,19 @@ class DNSJsonServerFactory(server.DNSServerFactory):
 
         # Access route_descriptors directly to perform complex filtering
         route_descriptor = {}
-        for _route_descriptor in self.routes.route_descriptors:
-            if re.search(_route_descriptor["route"], qname):
-                if lookup_cls == _route_descriptor.get("class", dns.IN):
+        for _route_descriptor, _ in self.routes.get_descriptors(qname, rfilter=lambda x: x.get("protocol") == "dns"):
+            if lookup_cls == _route_descriptor.get("class", dns.IN):
 
-                    # Convert the route_descriptor type to an integer
-                    rd_type = _route_descriptor.get("type", query.type)
-                    if not rd_type.isdigit():
-                        rd_type = dns.REV_TYPES.get(rd_type, 0)
+                # Convert the route_descriptor type to an integer
+                rd_type = _route_descriptor.get("type", query.type)
+                if not isinstance(rd_type, int):
+                    rd_type = dns.REV_TYPES.get(rd_type, 0)
 
-                    # If the lookup type matches the route_descriptor type
-                    if query.type == rd_type:
-                        logger.debug("Matched route {}".format(repr(_route_descriptor)))
-                        route_descriptor = _route_descriptor
-                        break
+                # If the lookup type matches the route_descriptor type
+                if query.type == rd_type:
+                    logger.debug("Matched route {}".format(repr(_route_descriptor)))
+                    route_descriptor = _route_descriptor
+                    break
 
-        return apply_middlewares(self.middlewares.get_descriptors(qname), _handleQuery)(route_descriptor, qname, lookup_cls, query.type, message, protocol, address)
+        middlewares = self.middlewares.get_descriptors(qname, rfilter=lambda x: x.get("protocol") == "dns_middleware")
+        return apply_middlewares(middlewares, _handleQuery)(route_descriptor, qname, lookup_cls, query.type, message, protocol, address)

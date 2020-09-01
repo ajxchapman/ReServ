@@ -1,0 +1,12 @@
+[
+    {
+        "protocol" : "dns_middleware",
+        "module" : "./scripts/logging_middleware/logger.py",
+        "function" : "dns_log"
+    },
+    {
+        "protocol" : "http_middleware",
+        "module" : "./scripts/logging_middleware/logger.py",
+        "function" : "http_log"
+    }
+]

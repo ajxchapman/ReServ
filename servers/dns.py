@@ -58,24 +58,6 @@ class DNSJsonServerFactory(server.DNSServerFactory):
         
         super().__init__(*args, **kwargs)
 
-    def sendReply(self, protocol, message, address):
-        r_addr, r_port = address if address is not None else ("N/A", 0)
-        if len(message.answers):
-            for answer in message.answers:
-                r_name = answer.name.name.decode("UTF-8")
-                r_type = dns.QUERY_TYPES.get(answer.type, "UnknownType")
-                r_answer = str(answer.payload)
-
-                logger.info("DNS: [{client:s}] - {query:s} {type:s} {answer:s}".format(client=r_addr, query=r_name, type=r_type, answer=r_answer))
-        else:
-            for query in message.queries:
-                r_name = query.name.name.decode("UTF-8")
-                r_type = dns.QUERY_TYPES.get(query.type, "UnknownType")
-
-                logger.info("DNS: [{client:s}] - {query:s} {type:s} -".format(client=r_addr, query=r_name, type=r_type))
-
-        super().sendReply(protocol, message, address)
-
     def _lookup(self, route_descriptor, qname, lookup_cls, qtype, timeout):
         records = []
         record_type = None
@@ -137,6 +119,9 @@ class DNSJsonServerFactory(server.DNSServerFactory):
         return [(), (), ()]
 
     def handleQuery(self, message, protocol, address):
+        def _handleQuery(route_descriptor, qname, lookup_cls, qtype, message, protocol, address):
+            return self._lookup(route_descriptor, qname, lookup_cls, qtype, 1000)
+
         query = message.queries[0]
 
         # Standardise the query name
@@ -147,9 +132,6 @@ class DNSJsonServerFactory(server.DNSServerFactory):
 
         # At this point we only know of dns.IN lookup classes
         lookup_cls = dns.IN
-
-        def _handleQuery(route_descriptor, qname, lookup_cls, qtype, message, protocol, address):
-            self.gotResolverResponse(self._lookup(route_descriptor, qname, lookup_cls, qtype, 1000), protocol, message, address)
 
         # Access route_descriptors directly to perform complex filtering
         route_descriptor = {}
@@ -163,9 +145,9 @@ class DNSJsonServerFactory(server.DNSServerFactory):
 
                 # If the lookup type matches the route_descriptor type
                 if query.type == rd_type:
-                    logger.debug("Matched route {}".format(repr(_route_descriptor)))
                     route_descriptor = _route_descriptor
                     break
 
         middlewares = self.routes.get_descriptors(qname, rfilter=lambda x: x.get("protocol") == "dns_middleware")
-        return utils.apply_middlewares(middlewares, _handleQuery)(route_descriptor, qname, lookup_cls, query.type, message, protocol, address)
+        response = utils.apply_middlewares(middlewares, _handleQuery)(route_descriptor, qname, lookup_cls, query.type, message, protocol, address)
+        self.gotResolverResponse(response, protocol, message, address)

@@ -137,42 +137,6 @@ class HTTPJsonResource(resource.Resource):
         middlewares = self.routes.get_descriptors(*request_parts, rfilter=lambda x: x.get("protocol") == "http_middleware")
         return utils.apply_middlewares(middlewares, _getChild)(route_descriptor, route_match, request)
 
-
-class HTTPSite(server.Site):
-    """
-    A Site which uses python logging
-    """
-
-    def log(self, request):
-        host = http._escape(request.getRequestHostname() or "-")
-        referrer = http._escape(request.getHeader(b"referer") or "-")
-        agent = http._escape(request.getHeader(b"user-agent") or "-")
-        line = '"{ip:s}" - {scheme:s}://{host:s}:{port:d} {timestamp:s} "{method:s} {uri:s} {protocol:s}" {code:d} {length:s} "{referrer:s}" "{agent:s}"'
-        line = line.format(
-            ip=http._escape(request.getClientIP() or "-"),
-            scheme="https" if request.isSecure() else "http",
-            host=host,
-            port=request.getHost().port,
-            timestamp=self._logDateTime,
-            method=http._escape(request.method),
-            uri=http._escape(request.uri),
-            protocol=http._escape(request.clientproto),
-            code=request.code,
-            length=str(request.sentLength) or "-",
-            referrer=referrer,
-            agent=agent,
-        )
-        logger.info(line)
-
-        if request.content is not None:
-            try:
-                request.content.seek(0, 0)
-                content = request.content.read()
-                if len(content):
-                    logger.info("Content: {}".format(content.decode("UTF-8")))
-            except:
-                pass
-
 class SSLContextFactory(ssl.ContextFactory):
     """
     A TLS context factory which selects a certificate from the files/keys directory

@@ -54,11 +54,10 @@ class HTTPJsonResource(resource.Resource):
 
         request_parts.append(request_path)
 
-        def _getChild(request):
+        def _getChild(route_descriptor, route_match, request):
             headers = {}
             resource_path = request_path
 
-            route_descriptor, route_match = self.routes.get_descriptor(*request_parts)
             if route_descriptor is not None:
                 headers = route_descriptor.get("headers", {})
 
@@ -133,7 +132,8 @@ class HTTPJsonResource(resource.Resource):
             # Default handling, 404 here
             return SimpleResource(request_path, 404, body=b'Not Found')
 
-        return apply_middlewares(self.middlewares.get_descriptors(*request_parts), _getChild)(request)
+        route_descriptor, route_match = self.routes.get_descriptor(*request_parts)
+        return apply_middlewares(self.middlewares.get_descriptors(*request_parts), _getChild)(route_descriptor, route_match, request)
 
 
 class HTTPSite(server.Site):

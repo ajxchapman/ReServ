@@ -4,6 +4,7 @@ from twisted.internet import reactor, defer, protocol
 from twisted.internet.ssl import ClientContextFactory
 from twisted.web.client import Agent, URI, ResponseDone, PotentialDataLoss, PartialDownloadError
 from twisted.web.iweb import IBodyProducer
+from twisted.web.error import SchemeNotSupported
 from zope.interface import implementer
 from twisted.web.http_headers import Headers
 
@@ -156,7 +157,7 @@ class HTTPJsonClient(Agent):
             else:
                 endpoint = self._getEndpoint(parsedURI)
         except SchemeNotSupported:
-            return defer.fail(Failure())
+            return defer.fail("Scheme not supported")
 
         parsedURI.path = path.encode("UTF-8") if path is not None else parsedURI.path
         key = (parsedURI.scheme, parsedURI.host, parsedURI.port)

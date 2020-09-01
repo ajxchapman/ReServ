@@ -13,7 +13,8 @@ from twisted.web.wsgi import WSGIResource
 from jsonroutes import JsonRoutes
 from servers.http_resources.simple import SimpleResource
 from servers.http_resources.forward import ForwardResource
-from utils import apply_middlewares, exec_cached_script
+
+import utils
 
 logger = logging.getLogger()
 
@@ -25,8 +26,8 @@ class HTTPJsonResource(resource.Resource):
 
     def __init__(self, domain, *args, **kwargs):
         self.filesroot = os.path.abspath(os.path.join("files"))
-        self.routes = JsonRoutes(protocol="http", domain=domain)
-        self.middlewares = JsonRoutes(protocol="http_middleware")
+        self.routes = utils.get_routes()
+
         super().__init__(*args, **kwargs)
 
     def getChild(self, name, request):
@@ -103,7 +104,7 @@ class HTTPJsonResource(resource.Resource):
                         # Execute python scripts
                         if os.path.splitext(resource_path)[1].lower() == ".py":
                             try:
-                                res = exec_cached_script(resource_path)
+                                res = utils.exec_cached_script(resource_path)
                                 # If the script exports an `app` variable, load it as a WSGI resource
                                 if "app" in res:
                                     return WSGIResource(reactor, reactor.getThreadPool(), res["app"])
@@ -132,8 +133,9 @@ class HTTPJsonResource(resource.Resource):
             # Default handling, 404 here
             return SimpleResource(request_path, 404, body=b'Not Found')
 
-        route_descriptor, route_match = self.routes.get_descriptor(*request_parts)
-        return apply_middlewares(self.middlewares.get_descriptors(*request_parts), _getChild)(route_descriptor, route_match, request)
+        route_descriptor, route_match = self.routes.get_descriptor(*request_parts, rfilter=lambda x: x.get("protocol") == "http")
+        middlewares = self.routes.get_descriptors(*request_parts, rfilter=lambda x: x.get("protocol") == "http_middleware")
+        return utils.apply_middlewares(middlewares, _getChild)(route_descriptor, route_match, request)
 
 
 class HTTPSite(server.Site):
@@ -171,7 +173,6 @@ class HTTPSite(server.Site):
             except:
                 pass
 
-
 class SSLContextFactory(ssl.ContextFactory):
     """
     A TLS context factory which selects a certificate from the files/keys directory
@@ -181,7 +182,7 @@ class SSLContextFactory(ssl.ContextFactory):
         self.ctx = SSL.Context(SSL.TLSv1_2_METHOD)
         self.ctx.set_tlsext_servername_callback(self.pick_certificate)
         self.tls_ctx = None
-        self.middlewares = JsonRoutes(protocol="ssl_middleware")
+        self.middlewares = utils.get_routes()
 
         dk_path = os.path.join("files", "keys", "domain.key")
         dc_path = os.path.join("files", "keys", "domain.crt")
@@ -198,12 +199,13 @@ class SSLContextFactory(ssl.ContextFactory):
         return self.ctx
 
     def pick_certificate(self, connection):
-        def _pick_certificate(connection):
+        def _pick_certificate(server_name_indication, connection):
             return self.tls_ctx
 
         # Apply middlewares
         server_name_indication = (connection.get_servername() or b'').decode("UTF-8")
-        ctx = apply_middlewares(self.middlewares.get_descriptors(server_name_indication), _pick_certificate)(connection)
+        middlewares = self.routes.get_descriptors(server_name_indication, rfilter=lambda x: x.get("protocol") == "ssl_middleware")
+        ctx = utils.apply_middlewares(middlewares, _pick_certificate)(server_name_indication, connection)
         if ctx is not None:
             connection.set_context(ctx)
         else:

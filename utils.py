@@ -1,9 +1,41 @@
+import json
 import logging
-import socket
 import os
+import socket
 
+import jsonroutes
 
 logger = logging.getLogger()
+
+_routes = None
+def get_routes():
+    """
+    Simple replacement for a singleton class to only ever create on instance of
+    the JSONRoutes class
+    """
+    global _routes
+    if _routes is not None:
+        return _routes
+    
+    _routes = jsonroutes.JsonRoutes(os.path.join("files", "routes", "**", "*.json"), os.path.join("files", "scripts", "**", "*routes.json"), os.path.join("files", "wwwroot", "**", "*routes.json"), variables=get_variables())
+    return _routes
+
+_variables = None
+def get_variables():
+    global _variables
+    if _variables is not None:
+        return _variables
+
+    # Set some default variables, these will be overwritten if they appear in the config
+    _variables = {
+        "ipv4_address" : get_ipv4_address(),
+        "ipv6_address" : get_ipv6_address()
+    }
+    if os.path.isfile("./config.json"):
+        with open("./config.json") as f:
+            _variables = {**_variables, **json.load(f).get("variables", {})}
+    
+    return _variables
 
 
 def get_ipv4_address(dest="8.8.8.8", port=80):

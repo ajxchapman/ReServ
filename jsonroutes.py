@@ -13,17 +13,32 @@ class JsonRoutes(object):
     """
     DEFAULT_SORT_KEY=lambda x: 100 if os.path.basename(x).startswith("default") else int((re.findall("^[0-9]+", os.path.basename(x)) + ["99"])[0])
 
-    def __init__(self, *args, key_func=None, cache_invalidate_time=60, **kwargs):
-        self.path_globs = list(args) or [os.path.join("files", "routes", "**", "*.json"), os.path.join("files", "scripts", "**", "*routes.json"), os.path.join("files", "wwwroot", "**", "*routes.json")]
+    def __init__(self, *args, key_func=None, cache_invalidate_time=60, variables={}, **kwargs):
+        self.path_globs = list(args)
         self.key_func = key_func or JsonRoutes.DEFAULT_SORT_KEY
         self.cache_invalidate_time = cache_invalidate_time
-        self.format_args = {k : re.escape(v) for k, v in kwargs.items()}
+        self.format_args = {**{str(k).upper() : v for k, v in variables.items()}, **{str(k).upper() : v for k, v in kwargs.items()}}
 
         self._cache = {}
         self._cache_update = 0
         self.json_routes = {}
         self._route_descriptors = []
         self._update_route_descriptors()
+
+    def replace_variables(self, repl, regex=False):
+        if isinstance(repl, str):
+            for variable in re.findall("\{\{([A-Za-z0-9_-]+)\}\}", repl):
+                # Don't use string format to avoid key errors with regex syntax, e.g. '[0-2]{1, 3}'
+                # HACK to allow non-regex string replacements in regex "route" variables
+                if regex:
+                    repl = repl.replace("{{" + variable + "}}", re.escape(str(self.format_args.get(variable.upper(), ""))))
+                else:
+                    repl = repl.replace("{{" + variable + "}}", str(self.format_args.get(variable.upper(), "")))
+        elif isinstance(repl, list):
+            repl = [self.replace_variables(value) for value in repl]
+        elif isinstance(repl, dict):
+            repl = {key: self.replace_variables(value, regex=key in ["route"]) for key, value in repl.items()}
+        return repl
 
     @property
     def route_descriptors(self):
@@ -63,16 +78,15 @@ class JsonRoutes(object):
                             try:
                                 with open(rd_path, "r") as f:
                                     default_sort_index = self.key_func(rd_path)
-                                    route_descriptors = json.load(f)
+                                    
+                                    # Expand variables
+                                    route_descriptors = self.replace_variables(json.load(f))
                                     for route_descriptor in route_descriptors:
-                                        # Apply default keys and expand placeholders
+                                        # Apply default keys
                                         if not "sort_index" in route_descriptor:
                                             route_descriptor["sort_index"] = default_sort_index
-                                        # Cheating string format to avoid key errors with regex syntax, e.g. '[0-2]{1, 3}'
+                                        # Compile regular expressions
                                         if "route" in route_descriptor:
-                                            for key, value in self.format_args.items():
-                                                route_descriptor["route"] = route_descriptor["route"].replace("{" + key + "}", value)
-                                            # Compile regular expressions for speed
                                             route_descriptor["route"] = re.compile(route_descriptor["route"])
                             except:
                                 logger.exception("Unable to parse json rule file '{}'".format(rd_path))

@@ -32,7 +32,7 @@ def get_variables():
         "ipv4_address" : get_ipv4_address(),
         "ipv6_address" : get_ipv6_address()
     }
-    _variables = {**_variables, **get_config()}
+    _variables = {**_variables, **get_config().get("variables", {})}
     return _variables
 
 _config = None
@@ -55,7 +55,6 @@ def get_config():
     if os.path.isfile("./config.json"):
         with open("./config.json") as f:
             _config = {**_config, **json.load(f)}
-        print(repr(_config))
         with open("./config.json", "w") as f:
             json.dump(_config, f, indent=4)
     return _config

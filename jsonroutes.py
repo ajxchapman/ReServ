@@ -46,7 +46,7 @@ class JsonRoutes(object):
         return self._route_descriptors
 
     def get_descriptor(self, *routes, rfilter=lambda x: True):
-        return (self.get_descriptors(*routes, rfilter=rfilter, first=True) or [(None, None)])[0]
+        return (self.get_descriptors(*routes, rfilter=rfilter, first=True) or [({}, "")])[0]
 
     def get_descriptors(self, *routes, rfilter=lambda x: True, first=False):
         self._update_route_descriptors()
@@ -88,6 +88,7 @@ class JsonRoutes(object):
                                         # Compile regular expressions
                                         if "route" in route_descriptor:
                                             route_descriptor["route"] = re.compile(route_descriptor["route"])
+                                        route_descriptor["_route_file"] = rd_path
                             except:
                                 logger.exception("Unable to parse json rule file '{}'".format(rd_path))
                             else:

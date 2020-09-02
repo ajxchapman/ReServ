@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import random
 import socket
 
 import jsonroutes
@@ -31,12 +32,33 @@ def get_variables():
         "ipv4_address" : get_ipv4_address(),
         "ipv6_address" : get_ipv6_address()
     }
-    if os.path.isfile("./config.json"):
-        with open("./config.json") as f:
-            _variables = {**_variables, **json.load(f).get("variables", {})}
-    
+    _variables = {**_variables, **get_config()}
     return _variables
 
+_config = None
+def get_config():
+    global _config
+    if _config is not None:
+        return _config
+
+    # Set default values
+    _config = {
+        "secret_key" : "".join(chr(random.randint(0, 128)) for x in range(32)),
+        "credentials" : [
+            {
+                "user" : "admin",
+                "password" : "".join(random.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789") for x in range(16))
+            }
+        ]
+    }
+
+    if os.path.isfile("./config.json"):
+        with open("./config.json") as f:
+            _config = {**_config, **json.load(f)}
+        print(repr(_config))
+        with open("./config.json", "w") as f:
+            json.dump(_config, f, indent=4)
+    return _config
 
 def get_ipv4_address(dest="8.8.8.8", port=80):
     """

@@ -1,97 +1,71 @@
-import logging
-import logging.handlers
+import json
 import os
 import sys
-import argparse
 
-usage = """python research_servers.py <command> [<args>]
+from twisted.internet import error, reactor
+from twisted.names import dns
+from twisted.web import server
 
-Available commands are:
-   start      Start the configured servers
-   route      Test route matches
-"""
+import servers.dns
+import servers.http
+import utils
 
 # Make sure our working directory is sane
 os.chdir(os.path.split(os.path.abspath(__file__))[0])
-logger = logging.getLogger()
-
-# Setup logginer
-logger.setLevel(logging.DEBUG)
-simple_formatter = logging.Formatter("%(levelname)s - %(message)s")
-verbose_formatter = logging.Formatter("%(asctime)s [%(levelname)s] <%(module)s>: %(message)s")
-stdout_handler = logging.StreamHandler()
-stdout_handler.setLevel(logging.INFO)
-stdout_handler.setFormatter(simple_formatter)
-file_handler = logging.handlers.TimedRotatingFileHandler(os.path.join("files", "logs", "server.log"), when='D', interval=1, utc=True)
-file_handler.setLevel(logging.DEBUG)
-file_handler.setFormatter(verbose_formatter)
-logger.addHandler(stdout_handler)
-logger.addHandler(file_handler)
-
 
 if __name__ == "__main__":
-    cmdline = sys.argv[1::]
-    parser = argparse.ArgumentParser(description="research servers", usage=usage)
-    parser.add_argument("command", help="Subcommand to run")
-    args = parser.parse_args(cmdline[0:1])
-    cmdline.pop(0)
-
-    if args.command == "start":
-        from twisted.internet import reactor
-        from twisted.names import dns
-
-        import servers.dns
-        import servers.http
-
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--ipv4", type=str, default=None, help="the default ipv4 address to response with")
-        parser.add_argument("--ipv6", type=str, default=None, help="the default ipv6 address to response with")
-        parser.add_argument("domain_name", type=str, default=None, help="the root domain name for the DNS server")
-        args = parser.parse_args(cmdline)
-
-        dns_server_factory = servers.dns.DNSJsonServerFactory(args.domain_name, ipv4_address=args.ipv4, ipv6_address=args.ipv6)
-        reactor.listenUDP(53, dns.DNSDatagramProtocol(dns_server_factory), interface="0.0.0.0")
-        reactor.listenTCP(53, dns_server_factory, interface="0.0.0.0")
-        logger.info("DNSJsonServerFactory listening on port 53/udp")
-        logger.info("DNSJsonServerFactory listening on port 53/tcp")
-
-        http_resource = servers.http.HTTPJsonResource(args.domain_name)
-        reactor.listenTCP(80, servers.http.HTTPSite(http_resource), interface="0.0.0.0")
-        logger.info("HTTPJsonResource listening on port 80/tcp")
-
+    service_count = 0
+    for service in utils.get_config().get("services", []):
         try:
-            reactor.listenSSL(443, servers.http.HTTPSite(http_resource), servers.http.SSLContextFactory(), interface="0.0.0.0")
-            logger.info("HTTPJsonResource listening on port 443/tcp")
-        except:
-            logger.exception("Unable to start TLS server")
-        reactor.run()
-    elif args.command == "route":
-        from jsonroutes import JsonRoutes
+            protocol = service["protocol"]
+            port = service["port"]
+            interface = service.get("interface", "0.0.0.0")
+        except KeyError:
+            print("Service must define a 'port' and a 'protocol'")
+            print(json.dumps(service, indent=4))
+            sys.exit(1)
+        else:
+            try:
+                if protocol == "http":
+                    unknown_arguments = set(service.keys()).difference(["protocol", "port", "interface", "certificate", "key"])
+                    if len(unknown_arguments):
+                        raise Exception(f"Unknown arguments for service 'http': ", ", ".join(f"'{x}'" for x in unknown_arguments))
 
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--protocol", "-p", type=str, default=None, help="the route protocol to test [dns, http, dns_middleware, http_middleware, ssl_middleware]")
-        parser.add_argument("--domain", "-d", type=str, default="example.com", help="the root domain name for this server")
-        parser.add_argument("--full", "-f", default=False, action="store_true", help="show the full matching route definition")
-        parser.add_argument("route", type=str, default=None, help="the route to match")
-        args = parser.parse_args(cmdline)
+                    if "certificate" in service:
+                        try:
+                            context_factory = servers.http.SSLContextFactory(service["certificate"], service.get("key"))
+                        except Exception as e:
+                            raise Exception(f"Error starting HTTPS service: '{e}'")
+                        else:
+                            reactor.listenSSL(port, server.Site(servers.http.HTTPJsonResource()), context_factory, interface=interface)
+                            print(f"Starting HTTPS service on port {port}/tcp")
+                    else:
+                        reactor.listenTCP(port, server.Site(servers.http.HTTPJsonResource()), interface=interface)
+                        print(f"Starting HTTP service on port {port}/tcp")
+                elif protocol == "dns":
+                    unknown_arguments = set(service.keys()).difference(["protocol", "port", "interface"])
+                    if len(unknown_arguments):
+                        raise Exception(f"Unknown arguments for service 'dns': ", ", ".join(f"'{x}'" for x in unknown_arguments))
 
-        routes = JsonRoutes(protocol=args.protocol, domain=args.domain)
-        route_files = sorted(routes.json_routes.keys(), key=routes.key)
-        for i, route in enumerate(routes.get_descriptors(args.route)):
-            route = route[0]
-            # Get the file the route is defined in, this is a bit of a hack
-            definition_file = None
-            for x in route_files:
-                if route in routes.json_routes[x]:
-                    definition_file = x
-                    break
-
-            print("!" if i == 0 else " ", end="")
-            if args.full:
-                print("[{}] {}:\n\t{}".format(i, definition_file, repr(route)))
+                    dns_server_factory = servers.dns.DNSJsonServerFactory()
+                    reactor.listenUDP(port, dns.DNSDatagramProtocol(dns_server_factory), interface=interface)
+                    reactor.listenTCP(port, dns_server_factory, interface=interface)
+                    print(f"Starting DNS service on port {port}/tcp and {port}/udp")
+                else:
+                    raise Exception(f"Unknown protocol '{protocol}'")
+                    
+            except Exception as e:
+                msg = str(e)
+                if isinstance(e, error.CannotListenError):
+                    msg = f"Cannot listen on '{interface}:{port}' address already in use"
+                print(msg)
+                print(json.dumps(service, indent=4))
+                sys.exit(1)
             else:
-                print("[{}] {}: {}".format(i, definition_file, route["route"]))
-    else:
-        print("Unrecognized command '{}'".format(command), file=sys.stderr)
-        parser.print_help()
+                service_count += 1
+
+
+    if service_count == 0:
+        print("No services defined in 'config.json'")
         sys.exit(1)
+    reactor.run()

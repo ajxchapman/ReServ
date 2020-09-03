@@ -7,5 +7,5 @@ files/keys/
 files/logs/
 venv/
 
-config.json
 files/certs/*.pem
+files/wwwroot/

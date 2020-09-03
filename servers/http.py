@@ -81,6 +81,9 @@ class HTTPJsonResource(resource.Resource):
                 # Path case
                 elif "path" in route_descriptor:
                     resource_path = route_descriptor["path"]
+                    if isinstance(route_descriptor["path"], dict):
+                        resource_path = route_descriptor["path"]["path"]
+
                     # Replace regex groups in the route path
                     for i, group in enumerate(re.search(route_descriptor["route"], route_match).groups()):
                         if group is not None:
@@ -106,7 +109,22 @@ class HTTPJsonResource(resource.Resource):
                         if os.path.splitext(resource_path)[1].lower() == ".py":
                             # Fixup the request path
                             request.postpath.insert(0, request.prepath.pop(0))
-                            
+                            if isinstance(route_descriptor.get("path"), dict):
+                                path_descriptor = route_descriptor["path"]
+                                if "base" in path_descriptor:
+                                    base = path_descriptor["base"]
+                                    request.prepath = base.strip("/").encode().split(b'/')
+                                    if request_path.startswith(base):
+                                        request.postpath = request_path.split(base, 1)[1].strip("/").encode().split(b'/')
+                                if "remap" in path_descriptor:
+                                    match = re.search(path_descriptor["remap"], request_path)
+                                    if match:
+                                        try:
+                                            remap = match.group(1)
+                                        except IndexError:
+                                            remap = match.group(0)
+                                        finally:
+                                            request.postpath = remap.encode().split(b'/')
                             try:
                                 res = utils.exec_cached_script(resource_path)
                                 # If the script exports an `app` variable, load it as a WSGI resource

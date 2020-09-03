@@ -8,7 +8,10 @@
   {
     "protocol" : "http",
     "route" : "^/httpbin/.*",
+    "path" : {
     "path" : "./scripts/httpbin.py",
+      "base" : "/httpbin"
+    },
     "comment" : "Rule for serving httpbin"
   },
   {

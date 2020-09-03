@@ -24,7 +24,7 @@ class HTTPJsonResource(resource.Resource):
     HTTP resource which serves response based on a JsonRoutes object
     """
 
-    def __init__(self, domain, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         self.filesroot = os.path.abspath(os.path.join("files"))
         self.routes = utils.get_routes()
 
@@ -91,18 +91,22 @@ class HTTPJsonResource(resource.Resource):
                 resource_path = os.path.abspath(os.path.join(self.filesroot, resource_path.lstrip("/")))
                 if resource_path.startswith(self.filesroot):
                     # If the resource_path does not exist, or is a directory, search for an index.py in each url path directory
+                    search_path = ""
                     if not os.path.isfile(resource_path):
                         search_dirs = [""] + resource_path.replace(self.filesroot, "").strip("/").split("/")
-                        current_dir = self.filesroot
                         for search_dir in search_dirs:
-                            current_dir = os.path.join(current_dir, search_dir)
-                            if os.path.isfile(os.path.join(current_dir, "index.py")):
-                                resource_path = os.path.join(current_dir, "index.py")
+                            search_path = os.path.join(search_path, search_dir)
+                            if os.path.isfile(os.path.join(self.filesroot, search_path, "index.py")):
+                                resource_path = os.path.join(self.filesroot, search_path, "index.py")
+                                break
 
                     # If the resource_path exists and is a file
                     if os.path.isfile(resource_path):
                         # Execute python scripts
                         if os.path.splitext(resource_path)[1].lower() == ".py":
+                            # Fixup the request path
+                            request.postpath.insert(0, request.prepath.pop(0))
+                            
                             try:
                                 res = utils.exec_cached_script(resource_path)
                                 # If the script exports an `app` variable, load it as a WSGI resource

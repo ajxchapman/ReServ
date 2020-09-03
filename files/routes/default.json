@@ -24,7 +24,8 @@
     "protocol" : "http",
     "route" : "^/example/.*",
     "forward" : "https://www.example.com",
-    "recreate_url" : false,
+    "recreate_url" : true,
+    "alert" : 1,
     "replace" : [
       {
         "pattern" : "[Ee]xample",
@@ -35,22 +36,13 @@
   },
   {
     "protocol" : "http",
-    "route" : "^/static/(.*)",
+    "route" : "^/(.*)",
     "path" : "./wwwroot/$1",
     "headers" : {
       "Access-Control-Allow-Origin" : "*",
       "Referrer-Policy" : "unsafe-url"
     },
     "comment" : "Rule for serving files under /static"
-  },
-  {
-    "protocol" : "http",
-    "route" : ".*",
-    "code" : 302,
-    "headers" : {
-      "location" : "/"
-    },
-    "comment" : "Catch-all rule to redirect anything else to index.html"
   },
   {
     "protocol" : "dns",
@@ -68,7 +60,8 @@
     "protocol" : "dns",
     "route" : "(.*\\.)?{{default_domain}}",
     "type" : "A",
-    "response" : "{{ipv4_address}}"
+    "response" : "{{ipv4_address}}",
+    "slack" : true
   },
   {
     "protocol" : "dns",

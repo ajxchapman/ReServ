@@ -6,3 +6,6 @@ __pycache__/
 files/keys/
 files/logs/
 venv/
+
+config.json
+files/certs/*.pem

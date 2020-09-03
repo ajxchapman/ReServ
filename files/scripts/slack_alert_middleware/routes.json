@@ -1,0 +1,18 @@
+[
+    {
+        "protocol" : "dns_middleware",
+        "module" : "./scripts/slack_alert_middleware/slack_alert.py",
+        "function" : "dns_alert",
+        "kwargs" : {
+            "webhook" : "{{slack_webhook_url}}"
+        }
+    },
+    {
+        "protocol" : "http_middleware",
+        "module" : "./scripts/slack_alert_middleware/slack_alert.py",
+        "function" : "http_alert",
+        "kwargs" : {
+            "webhook" : "{{slack_webhook_url}}"
+        }
+    }
+]

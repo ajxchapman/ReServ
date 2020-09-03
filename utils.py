@@ -18,7 +18,7 @@ def get_routes():
     if _routes is not None:
         return _routes
     
-    _routes = jsonroutes.JsonRoutes(os.path.join("files", "routes", "**", "*.json"), os.path.join("files", "scripts", "**", "*routes.json"), os.path.join("files", "wwwroot", "**", "*routes.json"), variables=get_variables())
+    _routes = jsonroutes.JsonRoutes(os.path.join("files", "routes", "**", "*.json"), os.path.join("files", "scripts", "**", "*routes.json"), variables=get_variables())
     return _routes
 
 _variables = None

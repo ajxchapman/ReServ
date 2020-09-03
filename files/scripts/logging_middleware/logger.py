@@ -1,10 +1,25 @@
 import datetime
 import logging
+import logging.handlers
+import os
 
 from twisted.names import dns
 from twisted.web import http
 
-logger = logging.getLogger()
+logger = logging.getLogger("server_log")
+
+# Setup logger
+logger.setLevel(logging.DEBUG)
+simple_formatter = logging.Formatter("%(levelname)s - %(message)s")
+verbose_formatter = logging.Formatter("%(asctime)s [%(levelname)s] <%(module)s>: %(message)s")
+stdout_handler = logging.StreamHandler()
+stdout_handler.setLevel(logging.INFO)
+stdout_handler.setFormatter(simple_formatter)
+file_handler = logging.handlers.TimedRotatingFileHandler(os.path.join("files", "logs", "server.log"), when='D', interval=1, utc=True)
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(verbose_formatter)
+logger.addHandler(stdout_handler)
+logger.addHandler(file_handler)
 
 def http_log(next, route, match, request):
     def _log(result, timestamp, request):
@@ -28,15 +43,6 @@ def http_log(next, route, match, request):
             agent=agent,
         )
         logger.info(line)
-
-    # if request.content is not None:
-    #     try:
-    #         request.content.seek(0, 0)
-    #         content = request.content.read()
-    #         if len(content):
-    #             logger.info("Content: {}".format(content.decode("UTF-8")))
-    #     except:
-    #         pass
 
     timestamp = datetime.datetime.now().isoformat()
 

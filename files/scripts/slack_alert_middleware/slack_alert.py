@@ -1,18 +1,39 @@
 import json
 import re
 
-from twisted.internet import reactor
+from twisted.internet import reactor, defer
 from twisted.web.http_headers import Headers
+from twisted.web.client import Agent
+from twisted.web.iweb import IBodyProducer
+from zope.interface import implementer
 
-import clients.http
+@implementer(IBodyProducer)
+class BytesProducer(object):
+    """
+    Simple string body producer
+    """
 
-def send_webhook(webhook, data):
-    if len(webhook):
-        agent = clients.http.HTTPJsonClient(reactor)
+    def __init__(self, body):
+        self.body = body
+        self.length = len(body)
+
+    def startProducing(self, consumer):
+        consumer.write(self.body)
+        return defer.succeed(None)
+
+    def pauseProducing(self):
+        pass
+
+    def stopProducing(self):
+        pass
+
+def send_webhook(url, data):
+    if len(url):
+        agent = Agent(reactor)
         headers = Headers()
         headers.addRawHeader("content-type", "application/json")
         
-        agent.request("POST", webhook, headers=headers, bodyProducer=clients.http.StringProducer(json.dumps(data).encode()))
+        agent.request(b"POST", url.encode(), headers, BytesProducer(json.dumps(data).encode()))
 
 def should_alert(route, path):
     alert = False

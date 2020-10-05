@@ -121,6 +121,8 @@ def apply_middlewares(routes, next_function):
 script_cache = {}
 def exec_cached_script(path):
     path = os.path.abspath(os.path.join(os.path.split(__file__)[0], "files", path))
+    if not path.startswith(os.path.abspath(os.path.join(os.path.split(__file__)[0], "files"))):
+        raise Exception("Attempted to load script '{}' from outside the `files` directory.".format(path))
     cache = script_cache.setdefault(path, {"mtime": 0, "vars": {}})
     if cache["mtime"] < os.path.getmtime(path):
         with open(path) as f:

@@ -10,7 +10,7 @@ from twisted.web.error import SchemeNotSupported
 from zope.interface import implementer
 from twisted.web.http_headers import Headers
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 # String body producer
 @implementer(IBodyProducer)
@@ -82,7 +82,7 @@ class CancelableReadBodyProtocol(protocol.Protocol):
                 # On an error return a PartialDownload response with whatever data we have already received
                 self.deferred.errback(PartialDownloadError(self.status, self.message, b''.join(self.dataBuffer)))
 
-class HTTPJsonClient(Agent):
+class HTTPClient(Agent):
     """
     A forgiving HTTP client
     """
@@ -173,11 +173,10 @@ class HTTPJsonClient(Agent):
 class ForwardResource(resource.Resource):
     isLeaf = True
 
-    def __init__(self, uri, *args, headers={}, replace=[], **kwargs):
+    def __init__(self, uri, *args, headers={}, **kwargs):
         self.uri = uri
         self.headers = headers
-        self.replace = replace
-        self.agent = HTTPJsonClient(reactor)
+        self.agent = HTTPClient(reactor)
         super().__init__(*args, **kwargs)
 
     def deliver_deferred_response(self, response, request):
@@ -186,13 +185,7 @@ class ForwardResource(resource.Resource):
             for header, values in response.headers.items():
                 request.responseHeaders.setRawHeaders(header, values)
 
-            body = response.body
-            if len(self.replace):
-                body = body.decode("UTF-8")
-                for replace_descriptor in self.replace:
-                    body = re.sub(replace_descriptor["pattern"], replace_descriptor["replacement"], body)
-                body = body.encode("UTF-8")
-            request.write(body)
+            request.write(response.body)
             request.finish()
         except:
             logger.exception("Unhandled exception")

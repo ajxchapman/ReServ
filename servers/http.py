@@ -1,3 +1,4 @@
+import copy
 import logging
 import os
 import re
@@ -16,8 +17,46 @@ from servers.http_resources.forward import ForwardResource
 
 import utils
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
+
+def _write(request, headers, replacements, data):
+    """
+    Function to apply headers and replacements to rendering responses.
+
+    This relies on some internal Twisted logic, so *could* break in future.
+    """
+    if not request.startedWriting:
+        for header, value in headers.items():
+            header = header.encode("UTF-8")
+            value = value.encode("UTF-8")
+            # HACK: To get around twisted's bizarre handling of http header cases
+            # Whilst according to the RFC headers *SHOULD* be treated as case
+            # insensitive, some clients and servers obviously haven't stuck
+            # to these rules
+            if not header.islower():
+                request.responseHeaders._caseMappings[header.lower()] = header
+            request.setHeader(header, value)
+
+    # NOTE: This will only work if the pattern attempted to be replaced does not
+    # appear on a data boundary
+    for r in replacements:
+        data = re.sub(r["pattern"], r["replacement"], data)
+    request.__class__.write(request, data)
+
+def get_script_response(resource_path, request):
+    try:
+        res = utils.exec_cached_script(resource_path)
+        # If the script exports an `app` variable, load it as a WSGI resource
+        if "app" in res:
+            return WSGIResource(reactor, reactor.getThreadPool(), res["app"])
+        elif "get_resource" in res:
+            return resource.IResource(res["get_resource"](request))
+        raise Exception("Script does not export `app` variable or `get_resource` function.")
+    except:
+        # Catch all exceptions and log them
+        logger.exception("Unahandled exception in exec'd file '{}'".format(resource_path))
+    return SimpleResource(500)
 
 class HTTPJsonResource(resource.Resource):
     """
@@ -56,104 +95,99 @@ class HTTPJsonResource(resource.Resource):
         request_parts.append(request_path)
 
         def _getChild(route_descriptor, route_match, request):
-            headers = {}
-            resource_path = request_path
+            response = SimpleResource(404, body=b'Not Found')
 
             if route_descriptor is not None:
-                headers = route_descriptor.get("headers", {})
+                response_def = route_descriptor.get("response")
+                if response_def is not None:
+                    response_type = response_def.get("type", "serve")
 
-                # Forward case
-                if "forward" in route_descriptor:
-                    # Recreate the URL
-                    if route_descriptor.get("recreate_url", True):
-                        fscheme, fnetloc, _, _, _, _ = urllib.parse.urlparse(route_descriptor["forward"])
-                        url = urllib.parse.urlunparse((fscheme, fnetloc, request.uri.decode("UTF-8"), "", "", ""))
-                    else:
-                        url = route_descriptor["forward"]
+                    if response_type == "serve":
+                        # Replace regex groups in the route path
+                        resource_path = response_def["path"]
+                        for i, group in enumerate(re.search(route_descriptor["route"], route_match).groups()):
+                            if group is not None:
+                                resource_path = resource_path.replace("${}".format(i + 1), group)
 
-                    replace = route_descriptor.get("replace", [])
-                    return ForwardResource(url, headers=headers, replace=replace)
-                # Code case
-                elif "code" in route_descriptor:
-                    code = route_descriptor.get("code", 200)
-                    body = route_descriptor.get("body", "").encode("UTF-8")
-                    return SimpleResource(request_path, code, headers=headers, body=body)
-                # Path case
-                elif "path" in route_descriptor:
-                    resource_path = route_descriptor["path"]
-                    if isinstance(route_descriptor["path"], dict):
-                        resource_path = route_descriptor["path"]["path"]
+                        # Security: Ensure the absolute resource_path is within the `self.filesroot` directory!
+                        # Prepend the resource_path with the self.filesroot and canonicalize
+                        resource_path = os.path.abspath(os.path.join(self.filesroot, resource_path.lstrip("/")))
+                        if resource_path.startswith(self.filesroot):
+                            # If the resource_path does not exist, or is a directory, search for an index.py in each url path directory
+                            if not os.path.isfile(resource_path):
+                                search_path = ""
+                                search_dirs = [""] + resource_path.replace(self.filesroot, "").strip("/").split("/")
+                                for search_dir in search_dirs:
+                                    search_path = os.path.join(search_path, search_dir)
+                                    if os.path.isfile(os.path.join(self.filesroot, search_path, "index.py")):
+                                        resource_path = os.path.join(self.filesroot, search_path, "index.py")
+                                        break
+                            
+                            if os.path.isfile(resource_path):
+                                # Execute python scripts
+                                if os.path.splitext(resource_path)[1].lower() == ".py":
+                                    # Fixup the request path
+                                    request.postpath.insert(0, request.prepath.pop(0))
+                                    response = get_script_response(resource_path, request)
+                                else:
+                                    data = b''
+                                    with open(resource_path, "rb") as f:
+                                        data = f.read()
+                                    response = SimpleResource(200, body=data)
 
-                    # Replace regex groups in the route path
-                    for i, group in enumerate(re.search(route_descriptor["route"], route_match).groups()):
-                        if group is not None:
-                            resource_path = resource_path.replace("${}".format(i + 1), group)
+                    elif response_type == "script":
+                        # Fixup the request path
+                        request.postpath.insert(0, request.prepath.pop(0))
 
-                # Security: Ensure the absolute resource_path is within the `self.filesroot` directory!
-                # Prepend the resource_path with the self.filesroot and canonicalize
-                resource_path = os.path.abspath(os.path.join(self.filesroot, resource_path.lstrip("/")))
-                if resource_path.startswith(self.filesroot):
-                    # If the resource_path does not exist, or is a directory, search for an index.py in each url path directory
-                    search_path = ""
-                    if not os.path.isfile(resource_path):
-                        search_dirs = [""] + resource_path.replace(self.filesroot, "").strip("/").split("/")
-                        for search_dir in search_dirs:
-                            search_path = os.path.join(search_path, search_dir)
-                            if os.path.isfile(os.path.join(self.filesroot, search_path, "index.py")):
-                                resource_path = os.path.join(self.filesroot, search_path, "index.py")
-                                break
+                        # Relocate to `base`
+                        if "base" in response_def:
+                            base = response_def["base"]
+                            request.prepath = base.strip("/").encode().split(b'/')
+                            if request_path.startswith(base):
+                                request.postpath = request_path.split(base, 1)[1].strip("/").encode().split(b'/')
 
-                    # If the resource_path exists and is a file
-                    if os.path.isfile(resource_path):
-                        # Execute python scripts
-                        if os.path.splitext(resource_path)[1].lower() == ".py":
-                            # Fixup the request path
-                            request.postpath.insert(0, request.prepath.pop(0))
-                            if isinstance(route_descriptor.get("path"), dict):
-                                path_descriptor = route_descriptor["path"]
-                                if "base" in path_descriptor:
-                                    base = path_descriptor["base"]
-                                    request.prepath = base.strip("/").encode().split(b'/')
-                                    if request_path.startswith(base):
-                                        request.postpath = request_path.split(base, 1)[1].strip("/").encode().split(b'/')
-                                if "remap" in path_descriptor:
-                                    match = re.search(path_descriptor["remap"], request_path)
-                                    if match:
-                                        try:
-                                            remap = match.group(1)
-                                        except IndexError:
-                                            remap = match.group(0)
-                                        finally:
-                                            request.postpath = remap.encode().split(b'/')
-                            try:
-                                res = utils.exec_cached_script(resource_path)
-                                # If the script exports an `app` variable, load it as a WSGI resource
-                                if "app" in res:
-                                    return WSGIResource(reactor, reactor.getThreadPool(), res["app"])
-                                return resource.IResource(res["get_resource"](request))
-                            except:
-                                # Catch all exceptions and log them
-                                logger.exception("Unahandled exception in exec'd file '{}'".format(resource_path))
-                        else:
-                            with open(resource_path, "rb") as f:
-                                data = f.read()
-                            replace = route_descriptor.get("replace", [])
-                            if len(replace):
-                                data = data.decode()
-                                for replace_descriptor in replace:
-                                    replacement = replace_descriptor["replacement"]
-                                    replacement = replacement.replace("{hostname}", host)
-                                    replacement = replacement.replace("{port}", str(port))
-                                    replacement = replacement.replace("{path}", path)
-                                    replacement = replacement.replace("{scheme}", scheme)
-                                    data = re.sub(replace_descriptor["pattern"], replacement, data)
-                                data = data.encode()
-                            return SimpleResource(request_path, 200, headers=headers, body=data)
-
-                        logger.debug("File not found '{}'".format(resource_path))
-
-            # Default handling, 404 here
-            return SimpleResource(request_path, 404, body=b'Not Found')
+                        # Apply rewrite
+                        if "rewrite" in response_def:
+                            match = re.search(response_def["rewrite"], request_path)
+                            if match:
+                                try:
+                                    rewrite = match.group(1)
+                                except IndexError:
+                                    rewrite = match.group(0)
+                                finally:
+                                    request.postpath = rewrite.encode().split(b'/')
+                        response = get_script_response(response_def["path"], request)
+                    elif response_type == "raw":
+                        code = response_def.get("code", 200)
+                        body = response_def.get("body", "").encode("UTF-8")
+                        response = SimpleResource(code, body=body)
+                    elif response_type == "forward":
+                        url = response_def["destination"]
+                        if response_def.get("recreate_url", True):
+                            fscheme, fnetloc, _, _, _, _ = urllib.parse.urlparse(url)
+                            url = urllib.parse.urlunparse((fscheme, fnetloc, request.uri.decode("UTF-8"), "", "", ""))
+                        response = ForwardResource(url, headers=response_def.get("request_headers", {}))
+                    
+                    
+                    headers = response_def.get("headers", {})
+                    # Take a copy of the `replace` array as we will modify it afterwards
+                    replace = copy.deepcopy(response_def.get("replace", []))
+                    if len(headers) or len(replace):
+                        if len(replace):
+                            # Prepare the replacements
+                            for replace_descriptor in replace:
+                                replacement = replace_descriptor["replacement"]
+                                replacement = replacement.replace("{hostname}", host)
+                                replacement = replacement.replace("{port}", str(port))
+                                replacement = replacement.replace("{path}", path)
+                                replacement = replacement.replace("{scheme}", scheme)
+                                replace_descriptor["pattern"] = replace_descriptor["pattern"].encode()
+                                replace_descriptor["replacement"] = replacement.encode()
+                        
+                        # Patch request.write to replace headers after rendering and perform replacements
+                        request.write = lambda data: _write(request, headers, replace, data)
+            
+            return response
 
         route_descriptor, route_match = self.routes.get_descriptor(*request_parts, rfilter=lambda x: x.get("protocol") == "http")
         middlewares = self.routes.get_descriptors(*request_parts, rfilter=lambda x: x.get("protocol") == "http_middleware")

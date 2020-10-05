@@ -2,13 +2,17 @@
   {
     "protocol" : "http",
     "route" : "^/(index\\.html?)?$",
-    "path" : "./wwwroot/index.html",
+    "response" : {
+      "type" : "serve",
+      "path" : "./wwwroot/index.html"
+    },
     "comment" : "Rule for serving the index file"
   },
   {
     "protocol" : "http",
     "route" : "^/httpbin/.*",
-    "path" : {
+    "response" : {
+      "type" : "script",
       "path" : "./scripts/httpbin.py",
       "base" : "/httpbin"
     },
@@ -17,33 +21,55 @@
   {
     "protocol" : "http",
     "route" : "^/.well-known/(?:.*/)*([^/]+)$",
-    "path" : "./wwwroot/.well-known/$1",
-    "headers" : {
-      "content-type" : "text/plain"
+    "response" : {
+      "type" : "serve",
+      "path" : "./wwwroot/.well-known/$1",
+      "headers" : {
+        "content-type" : "text/plain"
+      }
     },
     "comment" : "Rule for well-known file requests"
   },
   {
     "protocol" : "http",
     "route" : "^/example/.*",
-    "forward" : "https://www.example.com",
-    "recreate_url" : true,
+    "response" : {
+      "type" : "forward",
+      "destination" : "https://www.example.com",
+      "recreate_url" : true,
+      "replace" : [
+        {
+          "pattern" : "[Ee]xample",
+          "replacement" : "Whoot"
+        }
+      ]
+    },
     "alert" : 1,
-    "replace" : [
-      {
-        "pattern" : "[Ee]xample",
-        "replacement" : "Whoot"
+    "comment" : "Rule to forward to example.com"
+  },
+  {
+    "protocol" : "http",
+    "route" : "^/example_redirect/?.*",
+    "response" : {
+      "type" : "raw",
+      "code" : 302,
+      "headers" : {
+        "location" : "https://www.example.com"
       }
-    ],
+    },
+    "alert" : 1,
     "comment" : "Rule to forward to example.com"
   },
   {
     "protocol" : "http",
     "route" : "^/(.*)",
-    "path" : "./wwwroot/$1",
-    "headers" : {
-      "Access-Control-Allow-Origin" : "*",
-      "Referrer-Policy" : "unsafe-url"
+    "response" : {
+      "type" : "serve",
+      "path" : "./wwwroot/$1",
+      "headers" : {
+        "Access-Control-Allow-Origin" : "*",
+        "Referrer-Policy" : "unsafe-url"
+      }
     },
     "comment" : "Rule for serving files under /static"
   },

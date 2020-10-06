@@ -8,6 +8,7 @@ from twisted.web import server
 
 import servers.dns
 import servers.http
+import servers.ssl
 import utils
 
 # Make sure our working directory is sane
@@ -33,7 +34,7 @@ if __name__ == "__main__":
 
                     if "certificate" in service:
                         try:
-                            context_factory = servers.http.SSLContextFactory(service["certificate"], service.get("key"))
+                            context_factory = servers.ssl.SSLContextFactory(service["certificate"], service.get("key"))
                         except Exception as e:
                             raise Exception(f"Error starting HTTPS service: '{e}'")
                         else:

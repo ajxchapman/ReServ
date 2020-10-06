@@ -1,14 +1,18 @@
 [
   {
     "protocol" : "dns",
-    "route" : "_acme-challenge\\.{domain}",
-    "type" : "TXT",
-    "response" : ["Challenge1 Response", "Challenge2 Response"]
+    "route" : "_acme-challenge\\.{{default_domain}}",
+    "action" : {
+      "type" : "TXT",
+      "response" : ["Challenge1 Response", "Challenge2 Response"]
+    }
   },
   {
     "protocol" : "dns",
-    "route" : ".*{domain}$",
-    "type" : "CAA",
-    "response" : "0 issue \"letsencrypt.org\""
+    "route" : ".*{{default_domain}}$",
+    "action" : {
+      "type" : "CAA",
+      "response" : "0 issue \"letsencrypt.org\""
+    }
   }
 ]

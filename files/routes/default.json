@@ -2,78 +2,106 @@
   {
     "protocol" : "http",
     "route" : "^/(index\\.html?)?$",
-    "path" : "./wwwroot/index.html",
+    "action" : {
+      "handler" : "serve",
+      "path" : "./wwwroot/index.html"
+    },
     "comment" : "Rule for serving the index file"
   },
   {
     "protocol" : "http",
     "route" : "^/httpbin/.*",
-    "path" : "./scripts/httpbin.py",
+    "action" : {
+      "handler" : "script",
+      "path" : "./scripts/httpbin.py",
+      "base" : "/httpbin"
+    },
     "comment" : "Rule for serving httpbin"
   },
   {
     "protocol" : "http",
     "route" : "^/.well-known/(?:.*/)*([^/]+)$",
-    "path" : "./wwwroot/.well-known/$1",
-    "headers" : {
-      "content-type" : "text/plain"
+    "action" : {
+      "handler" : "serve",
+      "path" : "./wwwroot/.well-known/$1",
+      "headers" : {
+        "content-type" : "text/plain"
+      }
     },
     "comment" : "Rule for well-known file requests"
   },
   {
     "protocol" : "http",
     "route" : "^/example/.*",
-    "forward" : "https://www.example.com",
-    "recreate_url" : false,
-    "replace" : [
-      {
-        "pattern" : "[Ee]xample",
-        "replacement" : "Whoot"
-      }
-    ],
+    "action" : {
+      "handler" : "forward",
+      "destination" : "https://www.example.com",
+      "recreate_url" : true,
+      "replace" : [
+        {
+          "pattern" : "[Ee]xample",
+          "replacement" : "Whoot"
+        }
+      ]
+    },
     "comment" : "Rule to forward to example.com"
   },
   {
     "protocol" : "http",
-    "route" : "^/static/(.*)",
-    "path" : "./wwwroot/$1",
-    "headers" : {
-      "Access-Control-Allow-Origin" : "*",
-      "Referrer-Policy" : "unsafe-url"
+    "route" : "^/example_redirect/?.*",
+    "action" : {
+      "handler" : "raw",
+      "code" : 302,
+      "headers" : {
+        "location" : "https://www.example.com"
+      }
+    },
+    "comment" : "Rule to forward to example.com"
+  },
+  {
+    "protocol" : "http",
+    "route" : "^/(.*)",
+    "action" : {
+      "handler" : "serve",
+      "path" : "./wwwroot/$1",
+      "headers" : {
+        "Access-Control-Allow-Origin" : "*",
+        "Referrer-Policy" : "unsafe-url"
+      }
     },
     "comment" : "Rule for serving files under /static"
   },
   {
-    "protocol" : "http",
-    "route" : ".*",
-    "code" : 302,
-    "headers" : {
-      "location" : "/"
+    "protocol" : "dns",
+    "route" : "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?).ip.{{default_domain}}",
+    "action" : {
+      "type" : "A",
+      "response" : "$1.$2.$3.$4"
+    }
+  },
+  {
+    "protocol" : "dns",
+    "route" : "simple\\.cname\\.{{default_domain}}",
+    "action" : {
+      "record" : "CNAME",
+      "response" : "www.{{default_domain}}"
+    }
+  },
+  {
+    "protocol" : "dns",
+    "route" : "(.*\\.)?{{default_domain}}",
+    "action" : {
+      "type" : "A",
+      "response" : "{{ipv4_address}}"
     },
-    "comment" : "Catch-all rule to redirect anything else to index.html"
+    "slack" : true
   },
   {
     "protocol" : "dns",
-    "route" : "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?).ip.{domain}",
-    "type" : "A",
-    "response" : "$1.$2.$3.$4"
-  },
-  {
-    "protocol" : "dns",
-    "route" : "simple\\.cname\\.{domain}",
-    "record" : "CNAME",
-    "response" : "www.{domain}"
-  },
-  {
-    "protocol" : "dns",
-    "route" : "(.*\\.)?{domain}",
-    "type" : "A",
-    "response" : "{ipv4}"
-  },
-  {
-    "protocol" : "dns",
-    "route" : "(.*\\.)?{domain}",
-    "type" : "AAAA",
-    "response" : "{ipv6}"
+    "route" : "(.*\\.)?{{default_domain}}",
+    "action" : {
+      "type" : "AAAA",
+      "response" : "{{ipv6_address}}"
+    }
   }
 ]

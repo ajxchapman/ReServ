@@ -96,7 +96,7 @@ def get_record(lookup_name, lookup_cls, lookup_type):
         if preview or rebind_mappings[rebindtag]["time"] < time.time():
             return rebind_mappings[rebindtag]["address"]
 
-    return "{ipv4}"
+    return "{{ipv4_address}}"
 
 
 def get_resource(request):

@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 .ropeproject/
-files/keys/
-files/logs/
 venv/
+
+# Project specific files
+files/logs/
+files/certs/*.pem
+files/wwwroot/

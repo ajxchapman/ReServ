@@ -1,19 +1,27 @@
 [
   {
     "protocol" : "http",
-    "route" : "^https?://([a-z0-9]+\\.)?rebind\\.{domain}/(index.html)?$",
-    "path" : "./scripts/dnsrebind/index.html"
+    "route" : "^https?://([a-z0-9]+\\.)?rebind\\.{{default_domain}}/(index.html)?$",
+    "action" : {
+      "handler" : "serve",
+      "path" : "./scripts/dnsrebind/index.html"
+    }
   },
   {
     "protocol" : "http",
-    "route" : "^https?://([a-z0-9]+\\.)?rebind\\.{domain}",
-    "path" : "./scripts/dnsrebind/dnsrebind.py"
+    "route" : "^https?://([a-z0-9]+\\.)?rebind\\.{{default_domain}}(:[0-9]+)?/.*",
+    "action" : {
+      "handler" : "script",
+      "path" : "./scripts/dnsrebind/dnsrebind.py"
+    }
   },
   {
     "protocol" : "dns",
-    "route" : "[a-z0-9]+\\.rebind\\.{domain}$",
-    "script" : "./scripts/dnsrebind/dnsrebind.py",
-    "ttl" : 5,
-    "type" : "A"
+    "route" : "[a-z0-9]+\\.rebind\\.{{default_domain}}$",
+    "action" : {
+      "script" : "./scripts/dnsrebind/dnsrebind.py",
+      "ttl" : 5,
+      "type" : "A"
+    }
   }
 ]

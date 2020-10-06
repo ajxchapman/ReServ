@@ -2,8 +2,8 @@
   {
     "protocol" : "http",
     "route" : "^/(index\\.html?)?$",
-    "response" : {
-      "type" : "serve",
+    "action" : {
+      "handler" : "serve",
       "path" : "./wwwroot/index.html"
     },
     "comment" : "Rule for serving the index file"
@@ -11,8 +11,8 @@
   {
     "protocol" : "http",
     "route" : "^/httpbin/.*",
-    "response" : {
-      "type" : "script",
+    "action" : {
+      "handler" : "script",
       "path" : "./scripts/httpbin.py",
       "base" : "/httpbin"
     },
@@ -21,8 +21,8 @@
   {
     "protocol" : "http",
     "route" : "^/.well-known/(?:.*/)*([^/]+)$",
-    "response" : {
-      "type" : "serve",
+    "action" : {
+      "handler" : "serve",
       "path" : "./wwwroot/.well-known/$1",
       "headers" : {
         "content-type" : "text/plain"
@@ -33,8 +33,8 @@
   {
     "protocol" : "http",
     "route" : "^/example/.*",
-    "response" : {
-      "type" : "forward",
+    "action" : {
+      "handler" : "forward",
       "destination" : "https://www.example.com",
       "recreate_url" : true,
       "replace" : [
@@ -44,27 +44,25 @@
         }
       ]
     },
-    "alert" : 1,
     "comment" : "Rule to forward to example.com"
   },
   {
     "protocol" : "http",
     "route" : "^/example_redirect/?.*",
-    "response" : {
-      "type" : "raw",
+    "action" : {
+      "handler" : "raw",
       "code" : 302,
       "headers" : {
         "location" : "https://www.example.com"
       }
     },
-    "alert" : 1,
     "comment" : "Rule to forward to example.com"
   },
   {
     "protocol" : "http",
     "route" : "^/(.*)",
-    "response" : {
-      "type" : "serve",
+    "action" : {
+      "handler" : "serve",
       "path" : "./wwwroot/$1",
       "headers" : {
         "Access-Control-Allow-Origin" : "*",
@@ -76,26 +74,34 @@
   {
     "protocol" : "dns",
     "route" : "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?).ip.{{default_domain}}",
-    "type" : "A",
-    "response" : "$1.$2.$3.$4"
+    "action" : {
+      "type" : "A",
+      "response" : "$1.$2.$3.$4"
+    }
   },
   {
     "protocol" : "dns",
     "route" : "simple\\.cname\\.{{default_domain}}",
-    "record" : "CNAME",
-    "response" : "www.{{default_domain}}"
+    "action" : {
+      "record" : "CNAME",
+      "response" : "www.{{default_domain}}"
+    }
   },
   {
     "protocol" : "dns",
     "route" : "(.*\\.)?{{default_domain}}",
-    "type" : "A",
-    "response" : "{{ipv4_address}}",
+    "action" : {
+      "type" : "A",
+      "response" : "{{ipv4_address}}"
+    },
     "slack" : true
   },
   {
     "protocol" : "dns",
     "route" : "(.*\\.)?{{default_domain}}",
-    "type" : "AAAA",
-    "response" : "{{ipv6_address}}"
+    "action" : {
+      "type" : "AAAA",
+      "response" : "{{ipv6_address}}"
+    }
   }
 ]

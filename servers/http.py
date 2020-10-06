@@ -4,10 +4,7 @@ import os
 import re
 import urllib
 
-from OpenSSL import SSL
-
 from twisted.internet import reactor
-from twisted.internet import ssl
 from twisted.web import http, server, resource
 from twisted.web.wsgi import WSGIResource
 
@@ -98,13 +95,13 @@ class HTTPJsonResource(resource.Resource):
             response = SimpleResource(404, body=b'Not Found')
 
             if route_descriptor is not None:
-                response_def = route_descriptor.get("response")
-                if response_def is not None:
-                    response_type = response_def.get("type", "serve")
+                action_des = route_descriptor.get("action")
+                if action_des is not None:
+                    response_handler = action_des.get("handler", "serve")
 
-                    if response_type == "serve":
+                    if response_handler == "serve":
                         # Replace regex groups in the route path
-                        resource_path = response_def["path"]
+                        resource_path = action_des["path"]
                         for i, group in enumerate(re.search(route_descriptor["route"], route_match).groups()):
                             if group is not None:
                                 resource_path = resource_path.replace("${}".format(i + 1), group)
@@ -135,20 +132,20 @@ class HTTPJsonResource(resource.Resource):
                                         data = f.read()
                                     response = SimpleResource(200, body=data)
 
-                    elif response_type == "script":
+                    elif response_handler == "script":
                         # Fixup the request path
                         request.postpath.insert(0, request.prepath.pop(0))
 
                         # Relocate to `base`
-                        if "base" in response_def:
-                            base = response_def["base"]
+                        if "base" in action_des:
+                            base = action_des["base"]
                             request.prepath = base.strip("/").encode().split(b'/')
                             if request_path.startswith(base):
                                 request.postpath = request_path.split(base, 1)[1].strip("/").encode().split(b'/')
 
                         # Apply rewrite
-                        if "rewrite" in response_def:
-                            match = re.search(response_def["rewrite"], request_path)
+                        if "rewrite" in action_des:
+                            match = re.search(action_des["rewrite"], request_path)
                             if match:
                                 try:
                                     rewrite = match.group(1)
@@ -156,22 +153,22 @@ class HTTPJsonResource(resource.Resource):
                                     rewrite = match.group(0)
                                 finally:
                                     request.postpath = rewrite.encode().split(b'/')
-                        response = get_script_response(response_def["path"], request)
-                    elif response_type == "raw":
-                        code = response_def.get("code", 200)
-                        body = response_def.get("body", "").encode("UTF-8")
+                        response = get_script_response(action_des["path"], request)
+                    elif response_handler == "raw":
+                        code = action_des.get("code", 200)
+                        body = action_des.get("body", "").encode("UTF-8")
                         response = SimpleResource(code, body=body)
-                    elif response_type == "forward":
-                        url = response_def["destination"]
-                        if response_def.get("recreate_url", True):
+                    elif response_handler == "forward":
+                        url = action_des["destination"]
+                        if action_des.get("recreate_url", True):
                             fscheme, fnetloc, _, _, _, _ = urllib.parse.urlparse(url)
                             url = urllib.parse.urlunparse((fscheme, fnetloc, request.uri.decode("UTF-8"), "", "", ""))
-                        response = ForwardResource(url, headers=response_def.get("request_headers", {}))
+                        response = ForwardResource(url, headers=action_des.get("request_headers", {}))
                     
                     
-                    headers = response_def.get("headers", {})
+                    headers = action_des.get("headers", {})
                     # Take a copy of the `replace` array as we will modify it afterwards
-                    replace = copy.deepcopy(response_def.get("replace", []))
+                    replace = copy.deepcopy(action_des.get("replace", []))
                     if len(headers) or len(replace):
                         if len(replace):
                             # Prepare the replacements
@@ -192,40 +189,3 @@ class HTTPJsonResource(resource.Resource):
         route_descriptor, route_match = self.routes.get_descriptor(*request_parts, rfilter=lambda x: x.get("protocol") == "http")
         middlewares = self.routes.get_descriptors(*request_parts, rfilter=lambda x: x.get("protocol") == "http_middleware")
         return utils.apply_middlewares(middlewares, _getChild)(route_descriptor, route_match, request)
-
-class SSLContextFactory(ssl.ContextFactory):
-    """
-    A TLS context factory which selects a certificate from the files/keys directory
-    """
-
-    def __init__(self, dc_path, dk_path=None):
-        self.ctx = SSL.Context(SSL.TLSv1_2_METHOD)
-        self.ctx.set_tlsext_servername_callback(self.pick_certificate)
-        self.tls_ctx = None
-        self.routes = utils.get_routes()
-
-        dk_path = dk_path or dc_path
-        if os.path.exists(dk_path) and os.path.exists(dc_path):
-            ctx = SSL.Context(SSL.TLSv1_2_METHOD)
-            ctx.use_privatekey_file(dk_path)
-            ctx.use_certificate_file(dc_path)
-            ctx.use_certificate_chain_file(dc_path)
-            self.tls_ctx = ctx
-        else:
-            raise Exception("Unable to load TLS certificate information")
-
-    def getContext(self):
-        return self.ctx
-
-    def pick_certificate(self, connection):
-        def _pick_certificate(server_name_indication, connection):
-            return self.tls_ctx
-
-        # Apply middlewares
-        server_name_indication = (connection.get_servername() or b'').decode("UTF-8")
-        middlewares = self.routes.get_descriptors(server_name_indication, rfilter=lambda x: x.get("protocol") == "ssl_middleware")
-        ctx = utils.apply_middlewares(middlewares, _pick_certificate)(server_name_indication, connection)
-        if ctx is not None:
-            connection.set_context(ctx)
-        else:
-            connection.set_context(self.tls_ctx)

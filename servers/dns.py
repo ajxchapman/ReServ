@@ -63,11 +63,12 @@ class DNSJsonServerFactory(server.DNSServerFactory):
         record_type = None
 
         # Return an empty response if no route descriptor is found
-        if len(route_descriptor) == 0:
+        action_des = route_descriptor.get("action")
+        if action_des is None:
             return [(), (), ()]
 
-        # Convert the route_descriptor type to an integer
-        rd_type = route_descriptor.get("type", str(qtype))
+        # Convert the type to an integer
+        rd_type = action_des.get("type", str(qtype))
         if rd_type.isdigit():
             rd_type = int(rd_type)
             rd_type_name = dns.QUERY_TYPES.get(rd_type, "UnknownType")
@@ -75,33 +76,33 @@ class DNSJsonServerFactory(server.DNSServerFactory):
             rd_type_name = rd_type
             rd_type = dns.REV_TYPES.get(rd_type_name, 0)
 
-        ttl = int(route_descriptor.get("ttl", "60"))
+        ttl = int(action_des.get("ttl", "60"))
         record_type = qtype
         record_class = record_classes.get(rd_type_name, dns.UnknownRecord)
 
         # Determine the record type and record type class
-        if "record" in route_descriptor:
-            record_type = dns.REV_TYPES.get(route_descriptor["record"], 0)
-            record_class = record_classes.get(route_descriptor["record"], dns.UnknownRecord)
+        if "record" in action_des:
+            record_type = dns.REV_TYPES.get(action_des["record"], 0)
+            record_class = record_classes.get(action_des["record"], dns.UnknownRecord)
 
         # Obtain an array of responses
         responses = [self.ipv6_address if rd_type_name == "AAAA" else self.ipv4_address]
-        if "response" in route_descriptor:
-            responses = route_descriptor["response"]
+        if "response" in action_des:
+            responses = action_des["response"]
 
-        if "script" in route_descriptor:
+        if "script" in action_des:
             try:
-                args = route_descriptor.get("args", [])
-                kwargs = route_descriptor.get("kwargs", {})
-                get_record = utils.exec_cached_script(route_descriptor["script"])["get_record"]
+                args = action_des.get("args", [])
+                kwargs = action_des.get("kwargs", {})
+                get_record = utils.exec_cached_script(action_des["script"])["get_record"]
                 responses = get_record(qname, lookup_cls, qtype, *args, **kwargs)
             except:
-                logger.exception("Error executing script {}".format(route_descriptor["script"]))
+                logger.exception("Error executing script {}".format(action_des["script"]))
 
         # Coerce the response into a list
         if isinstance(responses, str):
             responses = [responses]
-        for response in responses if not route_descriptor.get("random", False) else [random.choice(responses)]:
+        for response in responses if not action_des.get("random", False) else [random.choice(responses)]:
             # Replace regex groups in the route path
             for i, group in enumerate(re.search(route_descriptor["route"], qname).groups()):
                 if group is not None:
@@ -136,10 +137,14 @@ class DNSJsonServerFactory(server.DNSServerFactory):
         # Access route_descriptors directly to perform complex filtering
         route_descriptor = {}
         for _route_descriptor, _ in self.routes.get_descriptors(qname, rfilter=lambda x: x.get("protocol") == "dns"):
-            if lookup_cls == _route_descriptor.get("class", dns.IN):
+            _action_des = _route_descriptor.get("action")
+            if _action_des is None:
+                continue
+
+            if lookup_cls == _action_des.get("class", dns.IN):
 
                 # Convert the route_descriptor type to an integer
-                rd_type = _route_descriptor.get("type", query.type)
+                rd_type = _action_des.get("type", query.type)
                 if not isinstance(rd_type, int):
                     rd_type = dns.REV_TYPES.get(rd_type, 0)
 

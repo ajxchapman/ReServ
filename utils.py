@@ -91,12 +91,13 @@ def apply_middlewares(routes, next_function):
     # Apply middlewares
     _func = next_function
     for middleware, _ in routes[::-1]:
-        _middleware_module_name = middleware.get("module", None)
+        middleware_des = middleware.get("action")
+        _middleware_module_name = middleware_des.get("module")
         if _middleware_module_name is None:
             logger.error("No module name specified for middleware")
             continue
 
-        _middleware_function_name = middleware.get("function", None)
+        _middleware_function_name = middleware_des.get("function")
         if _middleware_function_name is None:
             logger.error("No function name specified for middleware")
             continue
@@ -107,13 +108,13 @@ def apply_middlewares(routes, next_function):
             logger.exception("Unable to import middleware '{}'".format(_middleware_module_name))
             continue
 
-        _middleware_func = _middleware_module.get(_middleware_function_name, None)
+        _middleware_func = _middleware_module.get(_middleware_function_name)
         if _middleware_func is None:
             logger.error("Middleware funcion '{}' does not exist in '{}'".format(_middleware_function_name, _middleware_module_name))
             continue
 
-        _args = middleware.get("args", [])
-        _kwargs = middleware.get("kwargs", {})
+        _args = middleware_des.get("args", [])
+        _kwargs = middleware_des.get("kwargs", {})
 
         _func = (lambda m, f, a, k: lambda *args, **kwargs: m(f, *[*args, *a], **{**kwargs, **k}))(_middleware_func, _func, _args, _kwargs)
     return _func

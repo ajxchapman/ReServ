@@ -11,10 +11,10 @@ In order to use ReServ as the Server of Authority (SOA) for the chosen domain na
 ### Namecheap.com glue records
 
 To configure DNS glue records on namecheap.com go to the domain management page, and select the "Advanced DNS" configuration. Add *two* nameservers, e.g. `ns1.example.com` and `ns2.example.com` (both can point to the same IP address), under the 'PERSONAL DNS SERVER' configuration:
-![](docs/images/namecheap_add_nameservers.png)
+![](/docs/images/namecheap_add_nameservers.png)
 
 Once saved, go back to the main domain configuration, and set the 'NAMESERVERS' option to 'Custom DNS' and add the two nameservers configured above:
-![](docs/images/namecheap_configure_nameservers.png)
+![](/docs/images/namecheap_configure_nameservers.png)
 
 **Note**, it may take several hours for the glue records to propogate to nameservers across the internet.
 

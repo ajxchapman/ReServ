@@ -1,4 +1,4 @@
-This guide will help you get started using ReServ as the authoritative domain name server for a chosen domin name. In order to complete this guide you require a domain name to 
+This guide will help you get started using ReServ as the authoritative domain name server for a chosen domin name. In order to complete this guide you require a domain name on which to host ReServ.
 
 ## 1. Configuration
 

@@ -14,9 +14,9 @@ Features:
 Default configuration includes examples for DNS Rebinding attacks ([files/routes/30_dnsrebind.json](files/routes/30_dnsrebind.json) and [files/scripts/dnsrebind/dnsrebind.py](files/scripts/dnsrebind/dnsrebind.py)), slack alerting middleware ([files/scripts/slack_alert_middleware/](files/scripts/slack_alert_middleware/)) and responding to ACMEv2 dns-01 challenges ([files/routes/10_letsencrypt.json](files/routes/10_letsencrypt.json)).
 
 # Usage
-In order to start the servers use the following command:
+In order to start ReServ with the default configuration simply use the following command:
 ```bash
-$ python3 server.py <domain>
+$ python3 reserv.py
 ```
 # [Getting Started](docs/gettingstarted.md)
 

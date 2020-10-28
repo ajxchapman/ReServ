@@ -176,7 +176,7 @@ class ForwardResource(resource.Resource):
     def __init__(self, uri, *args, headers={}, **kwargs):
         self.uri = uri
         self.headers = headers
-        self.agent = HTTPClient(reactor)
+        self.agent = HTTPClient(reactor, timeout=20.0)
         super().__init__(*args, **kwargs)
 
     def deliver_deferred_response(self, response, request):

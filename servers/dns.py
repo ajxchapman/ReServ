@@ -110,11 +110,18 @@ class DNSJsonServerFactory(server.DNSServerFactory):
             
             # Allow for dynamic routes, e.g. returned by scripts, to include variables
             response = self.routes.replace_variables(response).encode()
-            records.append((qname, record_type, lookup_cls, ttl, record_class(response, ttl=ttl)))
+            records.append(dict(
+                name=qname, 
+                type=record_type, 
+                cls=lookup_cls, 
+                ttl=ttl, 
+                payload=record_class(response, ttl=ttl), 
+                auth=True
+            ))
 
         if len(records):
             try:
-                return [tuple([dns.RRHeader(*x) for x in records]) ,(), ()]
+                return [tuple([dns.RRHeader(**x) for x in records]) ,(), ()]
             except:
                 logger.exception("Unhandled exception with response")
         return [(), (), ()]

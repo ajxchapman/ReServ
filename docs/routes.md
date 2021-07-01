@@ -6,11 +6,13 @@ Routes are defined in json files under the `files/routes` and `files/scripts` di
 ### Generic route keys
 * `protocol`: The protocol type for the route (`http`, `dns`, `http_middleware`, `dns_middleware`, `ssl_middleware`). Depending on the protocol selected additional route keys will need to be defined.
 * `route`: *Optional* The regex to match on for the route, a descriptor without a route will match *all* routes
-* `action`: A dictionary defining the protocol specific route keys
+* `action`: A dictionary or list defining the protocol specific action to run
 * `sort_index`: *Optional* The key for sorting routes. **Default** If the route file filename begins with an integer, e.g. `50_http_routes.json`, the integer will be used for the `sort_index` of all routes which do not define an explicit `sort_index`, otherwise a `sort_index` of 99 is used.
 * `comment`: *Optional* A comment for the route
 
-### HTTP routes keys
+### HTTP actions
+
+HTTP actions should be specified as a single dictionary action descriptor. The following keys can be used:
 
 * `handler`: The handler of the http response (`serve`, `script`, `raw` or `forward`)
 * `headers`: *Optional* A dictionary of HTTP headers to return with the request
@@ -34,12 +36,16 @@ Routes are defined in json files under the `files/routes` and `files/scripts` di
   * `request_headers`: *Optional* Additional headers to send with the HTTP request. **Default** None.
 
 
-### DNS route keys
+### DNS actions
+
+DNS actions can be specified as a single dictionary action descriptor, or a list of multiple dictionary action descriptors. The following keys can be used:
 
 * `type`: *Optional* The type of the dns request to process, e.g. `A`, `AAAA`, `CNAME`, etc.
 * `class`: *Optional* The class of the dns request to process **Default** `IN`
 * `record`: *Optional* The record type to respond with **Default** Same as the request type
 * `ttl`: *Optional* The TTL of the response **Default** 60
+* `authoritative`: *Optional* Whether the response is authoritative or not **Default** True
+* `section`: *Optional* The section (`answer`, `authority`, `additional`) the response should be included in **Default** `answer`
 * `random`: *Optional* If more than response is generated, choose a random response instead of sending all of them **Default** false
 
 Route must include one of:

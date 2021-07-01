@@ -55,73 +55,81 @@ class DNSJsonServerFactory(server.DNSServerFactory):
         self.routes = utils.get_routes()
         self.ipv4_address = utils.get_variables().get("ipv4_address", utils.get_ipv4_address())
         self.ipv6_address = utils.get_variables().get("ipv6_address", utils.get_ipv6_address())
-        
+
         super().__init__(*args, **kwargs)
 
     def _lookup(self, route_descriptor, qname, lookup_cls, qtype, timeout):
-        records = []
-        record_type = None
+        answer = []
+        authority = []
+        additional = []
 
-        # Return an empty response if no route descriptor is found
-        action_des = route_descriptor.get("action")
-        if action_des is None:
-            return [(), (), ()]
+        action_descriptiors = route_descriptor.get("action", [])
+        if isinstance(action_descriptiors, dict):
+            action_descriptiors = [action_descriptiors]
+        for action in action_descriptiors:
+            # Convert the type to an integer
+            rd_type = action.get("type", str(qtype))
+            if rd_type.isdigit():
+                rd_type = int(rd_type)
+                rd_type_name = dns.QUERY_TYPES.get(rd_type, "UnknownType")
+            else:
+                rd_type_name = rd_type
+                rd_type = dns.REV_TYPES.get(rd_type_name, 0)
 
-        # Convert the type to an integer
-        rd_type = action_des.get("type", str(qtype))
-        if rd_type.isdigit():
-            rd_type = int(rd_type)
-            rd_type_name = dns.QUERY_TYPES.get(rd_type, "UnknownType")
-        else:
-            rd_type_name = rd_type
-            rd_type = dns.REV_TYPES.get(rd_type_name, 0)
+            ttl = int(action.get("ttl", "60"))
+            record_type = qtype
+            record_class = record_classes.get(rd_type_name, dns.UnknownRecord)
 
-        ttl = int(action_des.get("ttl", "60"))
-        record_type = qtype
-        record_class = record_classes.get(rd_type_name, dns.UnknownRecord)
+            # Determine the record type and record type class
+            if "record" in action:
+                record_type = dns.REV_TYPES.get(action["record"], 0)
+                record_class = record_classes.get(action["record"], dns.UnknownRecord)
 
-        # Determine the record type and record type class
-        if "record" in action_des:
-            record_type = dns.REV_TYPES.get(action_des["record"], 0)
-            record_class = record_classes.get(action_des["record"], dns.UnknownRecord)
+            # Obtain an array of responses
+            responses = [self.ipv6_address if rd_type_name == "AAAA" else self.ipv4_address]
+            if "response" in action:
+                responses = action["response"]
 
-        # Obtain an array of responses
-        responses = [self.ipv6_address if rd_type_name == "AAAA" else self.ipv4_address]
-        if "response" in action_des:
-            responses = action_des["response"]
+            if "script" in action:
+                try:
+                    args = action.get("args", [])
+                    kwargs = action.get("kwargs", {})
+                    get_record = utils.exec_cached_script(action["script"])["get_record"]
+                    responses = get_record(qname, lookup_cls, qtype, *args, **kwargs)
+                except:
+                    logger.exception("Error executing script {}".format(action["script"]))
 
-        if "script" in action_des:
+            # Coerce the response into a list
+            if isinstance(responses, str):
+                responses = [responses]
+            for response in responses if not action.get("random", False) else [random.choice(responses)]:
+                # Replace regex groups in the route path
+                for i, group in enumerate(re.search(route_descriptor["route"], qname).groups()):
+                    if group is not None:
+                        response = response.replace("${}".format(i + 1), group)
+
+                # Allow for dynamic routes, e.g. returned by scripts, to include variables
+                response = self.routes.replace_variables(response).encode()
+                record = dns.RRHeader(
+                    name=qname,
+                    type=record_type,
+                    cls=lookup_cls,
+                    ttl=ttl,
+                    payload=record_class(response, ttl=ttl),
+                    auth=action.get("authoritative", True)
+                )
+
+                if action.get("section") == "authority":
+                    authority.append(record)
+                elif action.get("section") == "additional":
+                    additional.append(record)
+                else:
+                    answer.append(record)
+
+        if len(answer + authority + additional):
             try:
-                args = action_des.get("args", [])
-                kwargs = action_des.get("kwargs", {})
-                get_record = utils.exec_cached_script(action_des["script"])["get_record"]
-                responses = get_record(qname, lookup_cls, qtype, *args, **kwargs)
-            except:
-                logger.exception("Error executing script {}".format(action_des["script"]))
-
-        # Coerce the response into a list
-        if isinstance(responses, str):
-            responses = [responses]
-        for response in responses if not action_des.get("random", False) else [random.choice(responses)]:
-            # Replace regex groups in the route path
-            for i, group in enumerate(re.search(route_descriptor["route"], qname).groups()):
-                if group is not None:
-                    response = response.replace("${}".format(i + 1), group)
-            
-            # Allow for dynamic routes, e.g. returned by scripts, to include variables
-            response = self.routes.replace_variables(response).encode()
-            records.append(dict(
-                name=qname, 
-                type=record_type, 
-                cls=lookup_cls, 
-                ttl=ttl, 
-                payload=record_class(response, ttl=ttl), 
-                auth=True
-            ))
-
-        if len(records):
-            try:
-                return [tuple([dns.RRHeader(**x) for x in records]) ,(), ()]
+                # answer, authority and additional sections
+                return [tuple(answer) , tuple(authority), tuple(additional)]
             except:
                 logger.exception("Unhandled exception with response")
         return [(), (), ()]

@@ -93,8 +93,15 @@
     "action" : {
       "type" : "A",
       "response" : "{{ipv4_address}}"
-    },
-    "slack" : true
+    }
+  },
+  {
+    "protocol" : "dns",
+    "route" : "(.*\\.)?{{default_domain}}",
+    "action" : {
+      "type" : "CNAME",
+      "response" : "www.{{default_domain}}"
+    }
   },
   {
     "protocol" : "dns",

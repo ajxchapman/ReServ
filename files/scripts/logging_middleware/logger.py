@@ -71,3 +71,8 @@ def dns_log(next, route, qname, lookup_cls, qtype, message, protocol, address):
             logger.info(" DNS [{timestamp:s}]: \"{client:s}\" - {query:s} {type:s} -".format(timestamp=timestamp, client=r_addr, query=r_name, type=r_type))
 
     return response
+
+def ssl_log(next, server_name_indication, connection):
+    timestamp = datetime.datetime.now().isoformat()
+    logger.info(" SSL [{timestamp:s}]: {sni:s}".format(timestamp=timestamp, sni=server_name_indication))
+    return next(server_name_indication, connection)

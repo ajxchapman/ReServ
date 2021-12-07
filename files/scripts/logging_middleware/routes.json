@@ -12,5 +12,12 @@
       "module" : "./scripts/logging_middleware/logger.py",
       "function" : "http_log"
     }
+  },
+  {
+    "protocol" : "ssl_middleware",
+    "action" : {
+      "module" : "./scripts/logging_middleware/logger.py",
+      "function" : "ssl_log"
+    }
   }
 ]

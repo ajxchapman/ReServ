@@ -1,0 +1,13 @@
+[
+    {
+        "protocol" : "http_middleware",
+        "route" : "(\\?|&)delay(=[^&?]*)?",
+        "action" : {
+            "module" : "./scripts/delay_middleware/delay.py",
+            "function" : "http_delay",
+            "kwargs" : {
+                "duration" : 1
+            }
+        }
+    }
+]

@@ -15,6 +15,7 @@
       "module" : "./scripts/slack_alert_middleware/slack_alert.py",
       "function" : "http_alert",
       "kwargs" : {
+        "check_route" : true,
         "webhook" : "{{slack_webhook_url}}"
       }
     }

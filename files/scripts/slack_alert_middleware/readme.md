@@ -8,3 +8,5 @@ Requires the `slack_webhook_url` configuration variable to be set in `config.jso
   }
 }
 ```
+
+Obtain a slack_webhook_url by creating a new Slack App at https://api.slack.com and adding an incoming webhook.

@@ -32,7 +32,7 @@ def send_webhook(url, data):
         agent = Agent(reactor)
         headers = Headers()
         headers.addRawHeader("content-type", "application/json")
-        
+
         agent.request(b"POST", url.encode(), headers, BytesProducer(json.dumps(data).encode()))
 
 def should_alert(route, path):
@@ -43,19 +43,20 @@ def should_alert(route, path):
             alert = re.search(route["slack"], path)
     return alert
 
-def http_alert(next, route, route_match, request, webhook=None):
-    if should_alert(route, route_match):
-        scheme = "https" if request.isSecure() else "http"
-        host = request.getRequestHostname().decode("UTF-8") or "-"
-        port = (":%d" % request.getHost().port) if request.getHost().port != {"http": 80, "https": 443}[scheme] else ""
-        query_string = request.uri.decode("UTF-8")
-        client = request.getClientIP()
+def http_alert(next, route, route_match, request, message="HTTP Alert:\n{url} requested from {client}\n```\n{request}```", webhook=None, check_route=False):
+    if check_route == False or should_alert(route, route_match):
+        args = {}
+        args["scheme"] = "https" if request.isSecure() else "http"
+        args["host"] = request.getRequestHostname().decode("UTF-8") or "-"
+        args["port"] = (":%d" % request.getHost().port) if request.getHost().port != {"http": 80, "https": 443}[args["scheme"]] else ""
+        args["query_string"] = request.uri.decode("UTF-8")
+        args["client"] = request.getClientIP()
 
-        url = f"{scheme}://{host}{port}{query_string}"
-        header_text = "\n".join(f"{key.decode()}: {b', '.join(value).decode()}" for key, value in request.requestHeaders.getAllRawHeaders())
-        request_text = f"{request.method.decode()} {query_string} {request.clientproto.decode()}\n{header_text}"
-        
-        message = f"HTTP Alert: {url} requested from {client}\n```\n{request_text}```"
+        args["url"] = f'{args["scheme"]}://{args["host"]}{args["port"]}{args["query_string"]}'
+        args["headers"] = "\n".join(f"{key.decode()}: {b', '.join(value).decode()}" for key, value in request.requestHeaders.getAllRawHeaders())
+        args["request"] = f'{request.method.decode()} {args["query_string"]} {request.clientproto.decode()}\n{args["headers"]}'
+
+        message = message.format(**args).strip()
         send_webhook(webhook, {"text" : message})
     return next(route, route_match, request)
 

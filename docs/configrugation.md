@@ -8,7 +8,7 @@ The services array defines the services and ports to run. Each service defines a
 
 ## Variables
 
-Variables definined in the configuration replace variable placeholders in defined routes. Variable place holders can be used in any route string values, and are defined with double handlbars, e.g. `{{variable}}`.
+Variables defined in the configuration replace variable placeholders in routes. Variable place holders can be used in any route string values, and are defined with double handlbars, e.g. `{{variable}}`.
 
 ## Anthing else
 

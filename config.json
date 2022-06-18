@@ -2,6 +2,13 @@
     "variables": {
         "default_domain": "example.com"
     },
+    "secret_key": "\u001cUY,SA/@7<k\u0006RW~yLC\u0013eD\rnQ*v\u0014sN5*.",
+    "credentials": [
+        {
+            "user": "admin",
+            "password": "DSLw7glFPSgdCvey"
+        }
+    ],
     "services": [
         {
             "port": 80,

@@ -34,6 +34,12 @@ def _write(request, headers, replacements, data):
             if not header.islower():
                 request.responseHeaders._caseMappings[header.lower()] = header
             request.setHeader(header, value)
+        
+        # When performing replacements, the content-length is not currently pre-calculated
+        if len(replacements):
+            request.responseHeaders.removeHeader("content-length")
+            request.setHeader("connection", "close")
+            
 
     # NOTE: This will only work if the pattern attempted to be replaced does not
     # appear on a data boundary
@@ -60,9 +66,10 @@ class HTTPJsonResource(resource.Resource):
     HTTP resource which serves response based on a JsonRoutes object
     """
 
-    def __init__(self, *args, **kwargs):
-        self.filesroot = os.path.abspath(os.path.join("files"))
-        self.routes = utils.get_routes()
+    def __init__(self, variables, routes, filesroot, *args, **kwargs):
+        self.variables = variables
+        self.routes = routes
+        self.filesroot = os.path.abspath(filesroot)
 
         super().__init__(*args, **kwargs)
 
@@ -92,7 +99,7 @@ class HTTPJsonResource(resource.Resource):
         request_parts.append(request_path)
 
         def _getChild(route_descriptor, route_match, request):
-            response = SimpleResource(404, body=b'Not Found')
+            response = SimpleResource(404, content=b'Not Found')
 
             if route_descriptor is not None:
                 action_des = route_descriptor.get("action")
@@ -127,10 +134,10 @@ class HTTPJsonResource(resource.Resource):
                                     request.postpath.insert(0, request.prepath.pop(0))
                                     response = get_script_response(resource_path, request)
                                 else:
-                                    data = b''
+                                    code = action_des.get("code", 200)
                                     with open(resource_path, "rb") as f:
                                         data = f.read()
-                                    response = SimpleResource(200, body=data)
+                                    response = SimpleResource(code, content=data)
 
                     elif response_handler == "script":
                         # Fixup the request path
@@ -157,7 +164,7 @@ class HTTPJsonResource(resource.Resource):
                     elif response_handler == "raw":
                         code = action_des.get("code", 200)
                         body = action_des.get("body", "").encode("UTF-8")
-                        response = SimpleResource(code, body=body)
+                        response = SimpleResource(code, content=body)
                     elif response_handler == "forward":
                         url = action_des["destination"]
                         if action_des.get("recreate_url", True):

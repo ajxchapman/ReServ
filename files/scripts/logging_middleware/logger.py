@@ -2,6 +2,7 @@ import datetime
 import logging
 import logging.handlers
 import os
+import string
 
 from twisted.names import dns
 from twisted.web import http
@@ -21,8 +22,12 @@ file_handler.setFormatter(verbose_formatter)
 logger.addHandler(stdout_handler)
 logger.addHandler(file_handler)
 
+printable_chars = set(bytes(string.printable, 'ascii'))
+def printable(data):
+    return all(x in printable_chars for x in data)
+
 def http_log(next, route, match, request):
-    def _log(result, timestamp, request):
+    def _log(result, timestamp, request, body):
         host = http._escape(request.getRequestHostname() or "-")
         referrer = http._escape(request.getHeader(b"referer") or "-")
         agent = http._escape(request.getHeader(b"user-agent") or "-")
@@ -30,7 +35,7 @@ def http_log(next, route, match, request):
         line = 'HTTP [{timestamp:s}]: "{ip:s}" - {scheme:s}://{host:s}:{port:d} "{method:s} {uri:s} {protocol:s}" {code:d} {length:s} "{referrer:s}" "{agent:s}"'
         line = line.format(
             ip=http._escape(request.getClientIP() or "-"),
-            scheme="https" if request.isSecure() else "http",
+            scheme="https" if request.isSecure() or request.host.port in [443, 8443] else "http",
             host=host,
             port=request.getHost().port,
             timestamp=timestamp,
@@ -44,10 +49,21 @@ def http_log(next, route, match, request):
         )
         logger.info(line)
 
-    timestamp = datetime.datetime.now().isoformat()
+        if route.get("debug") == True:
+            for k, v in request.requestHeaders.getAllRawHeaders():
+                print(f"\t{k.decode()}: {', '.join([x.decode() for x in v])}")
+            
+            if body is not None:
+                if printable(body):
+                    print("\n\t" + "\n\t".join(body.decode("ascii").splitlines()))
 
+    timestamp = datetime.datetime.now().isoformat()
+    body = None
+    if route.get("debug") == True:
+        body = request.content.read(4069)
+        request.content.seek(0)
     # Log after the request has finished so accurate response code and response length can be logged
-    request.notifyFinish().addBoth(_log, timestamp, request)
+    request.notifyFinish().addBoth(_log, timestamp, request, body)
     return next(route, match, request)
 
 def dns_log(next, route, qname, lookup_cls, qtype, message, protocol, address):

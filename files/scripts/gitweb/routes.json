@@ -1,0 +1,21 @@
+[
+  {
+    "protocol" : "http",
+    "route" : "^/gitweb/.*\\.git",
+    "action" : {
+      "handler" : "script",
+      "path" : "./scripts/gitweb/gitweb.py"
+    }
+  },
+  {
+    "protocol" : "dns",
+    "route" : "gitfile.*",
+    "action" : {
+      "type" : "A",
+      "response" : ["{{ipv4_address}}]"],
+      "random" : true,
+      "ttl" : 0
+    }
+  }
+]
+

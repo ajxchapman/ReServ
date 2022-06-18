@@ -1,0 +1,10 @@
+[
+    {
+        "protocol": "http",
+        "route": "https?://(file)?store\\.{{default_domain}}",
+        "action" : {
+            "handler" : "script",
+            "path" : "./scripts/filestore/filestore.py"
+        }
+    }
+]

@@ -81,13 +81,14 @@ class JsonRoutes(object):
                                     
                                     # Expand variables
                                     route_descriptors = self.replace_variables(json.load(f))
-                                    for route_descriptor in route_descriptors:
+                                    for index, route_descriptor in enumerate(route_descriptors):
                                         # Apply default keys
                                         if not "sort_index" in route_descriptor:
                                             route_descriptor["sort_index"] = default_sort_index
                                         # Compile regular expressions
                                         if "route" in route_descriptor:
                                             route_descriptor["route"] = re.compile(route_descriptor["route"])
+                                        route_descriptor["_route_index"] = index
                                         route_descriptor["_route_file"] = rd_path
                             except:
                                 logger.exception("Unable to parse json rule file '{}'".format(rd_path))

@@ -18,6 +18,19 @@ In order to start ReServ with the default configuration simply use the following
 ```bash
 $ python3 reserv.py
 ```
+
+Using Docker:
+```bash
+docker build --tag reserv .
+docker run -d -v `pwd`/config.json:/src/reserv/config.json -v `pwd`/files:/srv/reserv/files/ -p 53:53/udp -p 53:53/tcp -p 80:80/tcp -p 443:443/tcp reserv
+```
+
 # [Getting Started](docs/gettingstarted.md)
 
 See the [Getting Started](docs/gettingstarted.md) guide for setting up TLS, DNS glue records and more.
+
+# Running Tests
+
+```bash
+python3 -m unittest discover
+```

@@ -1,18 +1,14 @@
 import inspect
 import logging
-import os
 import random
 import re
 
+
 from twisted.names import dns, server
 
-from jsonroutes import JsonRoutes
 import utils
 
 logger = logging.getLogger()
-
-# Shim classes for DNS records that twisted does not support
-record_classes = {k.split("_", 1)[1] : v for k,v in inspect.getmembers(dns, lambda x: inspect.isclass(x) and x.__name__.startswith("Record_"))}
 
 class Record_CAA:
     """
@@ -21,8 +17,8 @@ class Record_CAA:
     TYPE = 257
     fancybasename = 'CAA'
 
-    def __init__(self, record, ttl=None):
-        record = record.split(b' ', 2)
+    def __init__(self, data=b'', ttl=None):
+        record = data.split(b' ', 2)
         self.flags = int(record[0])
         self.tag = record[1]
         self.value = record[2].replace(b'"', b'')
@@ -46,15 +42,74 @@ class Record_CAA:
 # Add CAA Type to the DNS Query and Reverse types lists
 dns.QUERY_TYPES[Record_CAA.TYPE] = Record_CAA.fancybasename
 dns.REV_TYPES[Record_CAA.fancybasename] = Record_CAA.TYPE
+
+# Shim classes for DNS records that twisted does not support
+record_classes = {k.split("_", 1)[1] : v for k,v in inspect.getmembers(dns, lambda x: inspect.isclass(x) and x.__name__.startswith("Record_"))}
 record_classes[Record_CAA.fancybasename] = Record_CAA
+record_signatures = {
+    dns.Record_A.TYPE : ("address", {"address" : bytes, "ttl" : int}, []),
+    dns.Record_AAAA.TYPE : ("address", {"address" : bytes, "ttl" : int}, []),
+    dns.Record_SOA.TYPE : (None, {"mname": bytes, "rname" : bytes, "serial" : int, "refresh" : int, "retry" : int, "expire" : int, "minimum" : int, "ttl" : int}, []),
+    dns.Record_SRV.TYPE : (None, {"priority" : int, "weight" : int, "port" : int, "target" : bytes, "ttl" : int}, []),
+    dns.Record_MX.TYPE : ("name", {"preference" : int, "name" : bytes, "ttl" : int}, []),
+    dns.Record_TXT.TYPE : ("data", {"data" : bytes, "ttl" : int}, ["data"]),
+    dns.Record_SPF.TYPE : ("data", {"data" : bytes, "ttl" : int}, ["data"]),
+    Record_CAA.TYPE : ("data", {"data" : bytes, "ttl" : int}, []),
+    -1 : ("name", {"name" : bytes, "ttl" : int}, []), # Catch-All
+}
+
+def normalise_response(replacements, route, query, record_class, responses):
+    default, arg_types, varargs = record_signatures.get(record_class.TYPE, record_signatures[-1])
+
+    # Coerce the response into a list
+    if not isinstance(responses, list):
+        responses = [responses]
+    
+    results = []
+    for response in responses:
+        # Coerce kwargs into a dict
+        kwargs = response
+        if not isinstance(response, dict):
+            if default is None:
+                raise Exception(f"Record {record_class.fancybasename} has no default")
+            kwargs = {default : response}
+       
+        # Replace replacements and search groups in response
+        kwargs = utils.replace_variables(kwargs, {**replacements, **{str(k): v for k, v in enumerate(re.search(route, query).groups(), 1)}})
+
+        # Cast response kwargs to correct types
+        for k in kwargs.keys():
+            v = kwargs[k]
+            if not isinstance(v, str):
+                continue
+            t = arg_types.get(k, str)
+            if not isinstance(v, t):
+                if t == bytes:
+                    v = v.encode()
+                elif t == int:
+                    v = int(v)
+                else:
+                    raise Exception(f"Uncastable type {t}")
+                kwargs[k] = v
+
+        # Extract varargs
+        args = []
+        for vararg in varargs:
+            args.append(kwargs[vararg])
+            del kwargs[vararg]
+        
+        # Create the record object
+        results.append(record_class(*args, **kwargs))
+    return results
 
 class DNSJsonServerFactory(server.DNSServerFactory):
     noisy = False
 
-    def __init__(self, *args, **kwargs):
-        self.routes = utils.get_routes()
-        self.ipv4_address = utils.get_variables().get("ipv4_address", utils.get_ipv4_address())
-        self.ipv6_address = utils.get_variables().get("ipv6_address", utils.get_ipv6_address())
+    def __init__(self, variables, routes, *args, **kwargs):
+        self.variables = variables
+        self.routes = routes
+        self.ipv4_address = variables["ipv4_address"]
+        self.ipv6_address = variables["ipv6_address"]
 
         super().__init__(*args, **kwargs)
 
@@ -99,23 +154,18 @@ class DNSJsonServerFactory(server.DNSServerFactory):
                 except:
                     logger.exception("Error executing script {}".format(action["script"]))
 
-            # Coerce the response into a list
-            if isinstance(responses, str):
-                responses = [responses]
+            # TODO: this bit
+            responses = normalise_response(xxxxxxxxxxxx sdfg)
             for response in responses if not action.get("random", False) else [random.choice(responses)]:
-                # Replace regex groups in the route path
-                for i, group in enumerate(re.search(route_descriptor["route"], qname).groups()):
-                    if group is not None:
-                        response = response.replace("${}".format(i + 1), group)
+                if response.ttl is None:
+                    response.ttl = ttl
 
-                # Allow for dynamic routes, e.g. returned by scripts, to include variables
-                response = self.routes.replace_variables(response).encode()
                 record = dns.RRHeader(
                     name=qname,
                     type=record_type,
                     cls=lookup_cls,
                     ttl=ttl,
-                    payload=record_class(response, ttl=ttl),
+                    payload=response,
                     auth=action.get("authoritative", True)
                 )
 

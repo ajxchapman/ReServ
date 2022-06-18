@@ -10,18 +10,19 @@ class SSLContextFactory(ssl.ContextFactory):
     A TLS context factory which selects a certificate from the files/keys directory
     """
 
-    def __init__(self, dc_path, dk_path=None):
+    def __init__(self, variables, routes, certificate_path, key_path=None):
+        self.variables = variables
+        self.routes = routes
         self.ctx = SSL.Context(SSL.TLSv1_2_METHOD)
         self.ctx.set_tlsext_servername_callback(self.pick_certificate)
         self.tls_ctx = None
-        self.routes = utils.get_routes()
 
-        dk_path = dk_path or dc_path
-        if os.path.exists(dk_path) and os.path.exists(dc_path):
+        key_path = key_path or certificate_path
+        if os.path.exists(key_path) and os.path.exists(certificate_path):
             ctx = SSL.Context(SSL.TLSv1_2_METHOD)
-            ctx.use_privatekey_file(dk_path)
-            ctx.use_certificate_file(dc_path)
-            ctx.use_certificate_chain_file(dc_path)
+            ctx.use_privatekey_file(key_path)
+            ctx.use_certificate_file(certificate_path)
+            ctx.use_certificate_chain_file(certificate_path)
             self.tls_ctx = ctx
         else:
             raise Exception("Unable to load TLS certificate information")

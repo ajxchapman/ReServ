@@ -1,0 +1,4 @@
+[{
+    "protocol" : "http",
+    "route" : "{{REPLACE}}"
+}]

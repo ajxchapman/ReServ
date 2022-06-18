@@ -2,27 +2,14 @@ import json
 import logging
 import os
 import random
+import re
 import socket
-
-import jsonroutes
 
 logger = logging.getLogger()
 
-_routes = None
-def get_routes():
-    """
-    Simple replacement for a singleton class to only ever create on instance of
-    the JSONRoutes class
-    """
-    global _routes
-    if _routes is not None:
-        return _routes
-    
-    _routes = jsonroutes.JsonRoutes(os.path.join("files", "routes", "**", "*.json"), os.path.join("files", "scripts", "**", "*routes.json"), variables=get_variables())
-    return _routes
 
 _variables = None
-def get_variables():
+def get_variables(config):
     global _variables
     if _variables is not None:
         return _variables
@@ -32,30 +19,39 @@ def get_variables():
         "ipv4_address" : get_ipv4_address(),
         "ipv6_address" : get_ipv6_address()
     }
-    _variables = {**_variables, **get_config().get("variables", {})}
+    _variables = {**_variables, **config.get("variables", {})}
     return _variables
 
-_config = None
-def get_config():
-    global _config
-    if _config is not None:
-        return _config
+def replace_variables(obj, replacements):
+    if isinstance(obj, str):
+        for variable in re.findall("((?:\{\{)[A-Za-z0-9_-]+(?:\}\})|\$[0-9]+)", obj):
+            obj = obj.replace(variable, str(replacements.get(variable.strip("${}"), "")))
+    elif isinstance(obj, list):
+        obj = [replace_variables(value, replacements) for value in obj]
+    elif isinstance(obj, dict):
+        obj = {key: replace_variables(value, replacements) for key, value in obj.items()}
+    return obj
 
+def get_config(path):
+    if not os.path.isfile(path):
+        raise Exception(f"Config file '{path}' does not exist")
+    
     # Set default values
     _config = {
-        "secret_key" : "".join(chr(random.randint(0, 128)) for x in range(32)),
-        "credentials" : [
-            {
-                "user" : "admin",
-                "password" : "".join(random.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789") for x in range(16))
-            }
-        ]
+        "variables": {
+            "secret_key" : "".join(chr(random.randint(0, 128)) for x in range(32)),
+            "credentials" : [
+                {
+                    "user" : "admin",
+                    "password" : "".join(random.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789") for x in range(16))
+                }
+            ]
+        }
     }
 
-    if os.path.isfile("./config.json"):
-        with open("./config.json") as f:
-            _config = {**_config, **json.load(f)}
-        with open("./config.json", "w") as f:
+    with open(path) as f:
+        _config = {**_config, **json.load(f)}
+    with open(path, "w") as f:
             json.dump(_config, f, indent=4)
     return _config
 

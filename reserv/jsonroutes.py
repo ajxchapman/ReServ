@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import time
+import uuid
 
 logger = logging.getLogger()
 
@@ -90,6 +91,7 @@ class JsonRoutes(object):
                                             route_descriptor["route"] = re.compile(route_descriptor["route"])
                                         route_descriptor["_route_index"] = index
                                         route_descriptor["_route_file"] = rd_path
+                                        route_descriptor["_uuid"] = str(uuid.uuid4())
                             except:
                                 logger.exception("Unable to parse json rule file '{}'".format(rd_path))
                             else:

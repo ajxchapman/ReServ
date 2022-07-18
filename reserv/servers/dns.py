@@ -2,13 +2,17 @@ import inspect
 import logging
 import random
 import re
-
+from urllib.parse import parse_qs, urlparse
 
 from twisted.names import dns, server
 
-import utils
+from jsonroutes import JsonRoutes
+import utils as utils
 
 logger = logging.getLogger()
+
+class DNSException(Exception):
+    pass
 
 class Record_CAA:
     """
@@ -44,18 +48,20 @@ dns.QUERY_TYPES[Record_CAA.TYPE] = Record_CAA.fancybasename
 dns.REV_TYPES[Record_CAA.fancybasename] = Record_CAA.TYPE
 
 # Shim classes for DNS records that twisted does not support
+type_bytes = lambda x: x.encode()
+type_bytearray = lambda x: [type_bytes(y) for y in (x if isinstance(x, list) else [x])]
 record_classes = {k.split("_", 1)[1] : v for k,v in inspect.getmembers(dns, lambda x: inspect.isclass(x) and x.__name__.startswith("Record_"))}
 record_classes[Record_CAA.fancybasename] = Record_CAA
 record_signatures = {
-    dns.Record_A.TYPE : ("address", {"address" : bytes, "ttl" : int}, []),
-    dns.Record_AAAA.TYPE : ("address", {"address" : bytes, "ttl" : int}, []),
-    dns.Record_SOA.TYPE : (None, {"mname": bytes, "rname" : bytes, "serial" : int, "refresh" : int, "retry" : int, "expire" : int, "minimum" : int, "ttl" : int}, []),
-    dns.Record_SRV.TYPE : (None, {"priority" : int, "weight" : int, "port" : int, "target" : bytes, "ttl" : int}, []),
-    dns.Record_MX.TYPE : ("name", {"preference" : int, "name" : bytes, "ttl" : int}, []),
-    dns.Record_TXT.TYPE : ("data", {"data" : bytes, "ttl" : int}, ["data"]),
-    dns.Record_SPF.TYPE : ("data", {"data" : bytes, "ttl" : int}, ["data"]),
-    Record_CAA.TYPE : ("data", {"data" : bytes, "ttl" : int}, []),
-    -1 : ("name", {"name" : bytes, "ttl" : int}, []), # Catch-All
+    dns.Record_A.TYPE : ("address", {"address" : type_bytes, "ttl" : int}, []),
+    dns.Record_AAAA.TYPE : ("address", {"address" : type_bytes, "ttl" : int}, []),
+    dns.Record_SOA.TYPE : (None, {"mname": type_bytes, "rname" : type_bytes, "serial" : int, "refresh" : int, "retry" : int, "expire" : int, "minimum" : int, "ttl" : int}, []),
+    dns.Record_SRV.TYPE : (None, {"priority" : int, "weight" : int, "port" : int, "target" : type_bytes, "ttl" : int}, []),
+    dns.Record_MX.TYPE : ("name", {"preference" : int, "name" : type_bytes, "ttl" : int}, []),
+    dns.Record_TXT.TYPE : ("data", {"data" : type_bytearray, "ttl" : int}, ["data"]),
+    dns.Record_SPF.TYPE : ("data", {"data" : type_bytearray, "ttl" : int}, ["data"]),
+    Record_CAA.TYPE : ("data", {"data" : type_bytes, "ttl" : int}, []),
+    -1 : ("name", {"name" : type_bytes, "ttl" : int}, []), # Catch-All
 }
 
 def normalise_response(replacements, route, query, record_class, responses):
@@ -71,7 +77,7 @@ def normalise_response(replacements, route, query, record_class, responses):
         kwargs = response
         if not isinstance(response, dict):
             if default is None:
-                raise Exception(f"Record {record_class.fancybasename} has no default")
+                raise DNSException(f"Record {record_class.fancybasename} has no default")
             kwargs = {default : response}
        
         # Replace replacements and search groups in response
@@ -79,37 +85,33 @@ def normalise_response(replacements, route, query, record_class, responses):
 
         # Cast response kwargs to correct types
         for k in kwargs.keys():
-            v = kwargs[k]
-            if not isinstance(v, str):
-                continue
-            t = arg_types.get(k, str)
-            if not isinstance(v, t):
-                if t == bytes:
-                    v = v.encode()
-                elif t == int:
-                    v = int(v)
-                else:
-                    raise Exception(f"Uncastable type {t}")
-                kwargs[k] = v
+            try:
+                kwargs[k] = arg_types.get(k, str)(kwargs[k])
+            except (ValueError, TypeError):
+                raise DNSException(f"Uncastable type '{v}' for DNS {dns.QUERY_TYPES[record_class.TYPE]} response")
 
         # Extract varargs
         args = []
         for vararg in varargs:
-            args.append(kwargs[vararg])
+            args.extend(kwargs[vararg])
             del kwargs[vararg]
         
         # Create the record object
-        results.append(record_class(*args, **kwargs))
+        try:
+            results.append(record_class(*args, **kwargs))
+        except TypeError as e:
+            # TODO: Add inspect.signature parsing here
+            raise DNSException(f"Unknown argument to DNS {dns.QUERY_TYPES[record_class.TYPE]} response")
     return results
 
 class DNSJsonServerFactory(server.DNSServerFactory):
+    proto = "DNS"
     noisy = False
 
-    def __init__(self, variables, routes, *args, **kwargs):
+    def __init__(self, variables: dict, routes: JsonRoutes, opts: dict, *args, **kwargs):
         self.variables = variables
         self.routes = routes
-        self.ipv4_address = variables["ipv4_address"]
-        self.ipv6_address = variables["ipv6_address"]
+        self.opts = opts
 
         super().__init__(*args, **kwargs)
 
@@ -132,16 +134,17 @@ class DNSJsonServerFactory(server.DNSServerFactory):
                 rd_type = dns.REV_TYPES.get(rd_type_name, 0)
 
             ttl = int(action.get("ttl", "60"))
-            record_type = qtype
-            record_class = record_classes.get(rd_type_name, dns.UnknownRecord)
+            
 
             # Determine the record type and record type class
+            record_type = qtype
+            record_class = record_classes.get(rd_type_name, dns.UnknownRecord)
             if "record" in action:
                 record_type = dns.REV_TYPES.get(action["record"], 0)
                 record_class = record_classes.get(action["record"], dns.UnknownRecord)
 
             # Obtain an array of responses
-            responses = [self.ipv6_address if rd_type_name == "AAAA" else self.ipv4_address]
+            responses = []
             if "response" in action:
                 responses = action["response"]
 
@@ -154,8 +157,7 @@ class DNSJsonServerFactory(server.DNSServerFactory):
                 except:
                     logger.exception("Error executing script {}".format(action["script"]))
 
-            # TODO: this bit
-            responses = normalise_response(xxxxxxxxxxxx sdfg)
+            responses = normalise_response(self.variables, route_descriptor["route"], qname, record_class, responses)
             for response in responses if not action.get("random", False) else [random.choice(responses)]:
                 if response.ttl is None:
                     response.ttl = ttl
@@ -199,25 +201,38 @@ class DNSJsonServerFactory(server.DNSServerFactory):
         # At this point we only know of dns.IN lookup classes
         lookup_cls = dns.IN
 
+        route_descriptor, qname, middlewares = self.filter_routes(f"dns://{qname}?type={query.type}")
+        response = utils.apply_middlewares(self.opts, middlewares, _handleQuery)(route_descriptor, qname, lookup_cls, query.type, message, protocol, address)
+        self.gotResolverResponse(response, protocol, message, address)
+
+
+    def filter_routes(self, uri):
+        parsed_uri = urlparse(uri)
+        parsed_qs = parse_qs(parsed_uri.query)
+        if parsed_uri.scheme != "dns":
+            raise DNSException(f"Unrecognised scheme '{parsed_uri.scheme}'")
+        query_name = parsed_uri.hostname
+        query_cls = int(parsed_qs.get("cls", [dns.IN])[0]) # default to dns.IN
+        query_type = parsed_qs.get("type", [dns.Record_A.TYPE])[0] # default to dns.Record_A
+        query_type = dns.REV_TYPES.get(query_type) or int(query_type)
+
         # Access route_descriptors directly to perform complex filtering
         route_descriptor = {}
-        for _route_descriptor, _ in self.routes.get_descriptors(qname, rfilter=lambda x: x.get("protocol") == "dns"):
+        for _route_descriptor, _ in self.routes.get_descriptors(query_name, rfilter=lambda x: x.get("protocol") == "dns"):
             _action_des = _route_descriptor.get("action")
             if _action_des is None:
                 continue
 
-            if lookup_cls == _action_des.get("class", dns.IN):
-
+            if query_cls == _action_des.get("class", dns.IN):
                 # Convert the route_descriptor type to an integer
-                rd_type = _action_des.get("type", query.type)
+                rd_type = _action_des.get("type", query_type)
                 if not isinstance(rd_type, int):
                     rd_type = dns.REV_TYPES.get(rd_type, 0)
 
                 # If the lookup type matches the route_descriptor type
-                if query.type == rd_type:
+                if query_type == rd_type:
                     route_descriptor = _route_descriptor
                     break
 
-        middlewares = self.routes.get_descriptors(qname, rfilter=lambda x: x.get("protocol") == "dns_middleware")
-        response = utils.apply_middlewares(middlewares, _handleQuery)(route_descriptor, qname, lookup_cls, query.type, message, protocol, address)
-        self.gotResolverResponse(response, protocol, message, address)
+        middlewares = self.routes.get_descriptors(query_name, rfilter=lambda x: x.get("protocol") == "dns_middleware")
+        return route_descriptor, query_name, middlewares

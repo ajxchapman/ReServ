@@ -1,0 +1,54 @@
+[
+    {
+        "protocol" : "dns",
+        "route" : "a.example.com",
+        "action" : {
+            "type" : "A",
+            "response" : {
+                "address" : "127.0.0.1"
+            }
+        }
+    },
+    {
+        "protocol" : "dns",
+        "route" : "aaaa.example.com",
+        "action" : {
+            "type" : "AAAA",
+            "response" : {
+                "address" : "::1"
+            }
+        }
+    },
+    {
+        "protocol" : "dns",
+        "route" : "acname.example.com",
+        "action" : {
+            "type" : "A",
+            "record" : "CNAME",
+            "response" : {
+                "name" : "example.com"
+            }
+        }
+    },
+    {
+        "protocol" : "dns",
+        "route" : "txt.example.com",
+        "action" : {
+            "type" : "TXT",
+            "response" : {
+                "data": ["Data1", "Data2"]
+            }
+        }
+    },
+    {
+        "protocol" : "dns",
+        "route" : "mx.example.com",
+        "action" : {
+            "type" : "MX",
+            "response" : {
+                "preference" : 10,
+                "name" : "mail.example.com"
+            }
+        }
+    }
+]

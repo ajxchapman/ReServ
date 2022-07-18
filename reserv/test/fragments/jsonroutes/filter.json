@@ -1,0 +1,29 @@
+[
+    {
+        "id" : 1,
+        "protocol" : "http",
+        "route" : "^http://example.com/.*$",
+        "action" : {
+            "handler" : "serve",
+            "path" : "./index.html"
+        }
+    },
+    {
+        "id" : 2,
+        "protocol" : "dns",
+        "route" : "example.com",
+        "action" : {
+            "type" : "A",
+            "response" : "127.0.0.1"
+        }
+    },
+    {
+        "id" : 3,
+        "protocol" : "dns",
+        "route" : "example.com",
+        "action" : {
+            "type" : "AAAA",
+            "response" : "::1"
+        }
+    }
+]

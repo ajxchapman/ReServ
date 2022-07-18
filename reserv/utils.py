@@ -83,7 +83,7 @@ def get_ipv6_address(dest="2001:4860:4860::8888", port=80):
     return "::1"
 
 
-def apply_middlewares(routes, next_function):
+def apply_middlewares(opts, routes, next_function):
     # Apply middlewares
     _func = next_function
     for middleware, _ in routes[::-1]:
@@ -99,7 +99,7 @@ def apply_middlewares(routes, next_function):
             continue
 
         try:
-            _middleware_module = exec_cached_script(_middleware_module_name)
+            _middleware_module = exec_cached_script(opts.files_root, _middleware_module_name)
         except Exception:
             logger.exception("Unable to import middleware '{}'".format(_middleware_module_name))
             continue
@@ -116,9 +116,9 @@ def apply_middlewares(routes, next_function):
     return _func
 
 script_cache = {}
-def exec_cached_script(path):
-    path = os.path.abspath(os.path.join(os.path.split(__file__)[0], "files", path))
-    if not path.startswith(os.path.abspath(os.path.join(os.path.split(__file__)[0], "files"))):
+def exec_cached_script(root, path):
+    path = os.path.abspath(os.path.join(root, path.lstrip("/")))
+    if not path.startswith(root):
         raise Exception("Attempted to load script '{}' from outside the `files` directory.".format(path))
     cache = script_cache.setdefault(path, {"mtime": 0, "vars": {}})
     if cache["mtime"] < os.path.getmtime(path):

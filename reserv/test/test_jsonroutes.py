@@ -1,7 +1,7 @@
 import os
 import unittest
 
-from src.jsonroutes import JsonRoutes
+from jsonroutes import JsonRoutes
 
 class TestJsonRoutes(unittest.TestCase):
     def test_init(self):

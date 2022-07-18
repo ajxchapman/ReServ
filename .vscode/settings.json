@@ -1,0 +1,12 @@
+{
+    "python.defaultInterpreterPath": "/usr/local/bin/python",
+    "python.testing.unittestArgs": [
+        "-v",
+        "-s",
+        "./reserv/",
+        "-p",
+        "test_*.py"
+    ],
+    "python.testing.pytestEnabled": false,
+    "python.testing.unittestEnabled": true
+}

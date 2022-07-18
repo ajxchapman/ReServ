@@ -1,0 +1,10 @@
+[
+    {
+        "protocol" : "http",
+        "route" : "^/index.html$",
+        "action" : {
+          "handler" : "serve",
+          "path" : "./index.html"
+        }
+      }
+]

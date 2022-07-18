@@ -2,10 +2,10 @@ import copy
 import logging
 import os
 import re
-import urllib
+from urllib.parse import urlparse, urlunparse
 
 from twisted.internet import reactor
-from twisted.web import http, server, resource
+from twisted.web import server, resource
 from twisted.web.wsgi import WSGIResource
 
 from jsonroutes import JsonRoutes
@@ -16,6 +16,8 @@ import utils
 
 logger = logging.getLogger(__name__)
 
+class HTTPException(Exception):
+    pass
 
 def _write(request, headers, replacements, data):
     """
@@ -66,38 +68,15 @@ class HTTPJsonResource(resource.Resource):
     HTTP resource which serves response based on a JsonRoutes object
     """
 
-    def __init__(self, variables, routes, filesroot, *args, **kwargs):
+    def __init__(self, variables: dict, routes: JsonRoutes, opts: dict, *args, **kwargs):
         self.variables = variables
         self.routes = routes
-        self.filesroot = os.path.abspath(filesroot)
+        self.opts = opts
+        self.filesroot = os.path.abspath(opts.files_root)
 
         super().__init__(*args, **kwargs)
 
-    def getChild(self, name, request):
-        # Rebuild the request parts for route matching
-        scheme = "https" if request.isSecure() else "http"
-        host = request.getRequestHostname().decode("UTF-8") or "-"
-        port = request.getHost().port
-        path = request.path.decode("UTF-8")
-        args = (request.uri.decode("UTF-8").split("?", 1) + [""])[1]
-
-        # Match on any of scheme://host(:port)/path?args, /path?args, /path in that order
-        request_path = path
-        request_parts = []
-        
-        request_parts.append("{scheme}://{host}{port}{path}{args}".format(
-            scheme=scheme,
-            host=host,
-            port=(":%d" % port) if port != {"http": 80, "https": 443}[scheme] else "",
-            path=request_path,
-            args= "?" + args if args else ""
-        ))
-
-        if args:
-            request_parts.append(request_path + "?" + args)
-
-        request_parts.append(request_path)
-
+    def getChild(self, request_path, request):
         def _getChild(route_descriptor, route_match, request):
             response = SimpleResource(404, content=b'Not Found')
 
@@ -168,8 +147,8 @@ class HTTPJsonResource(resource.Resource):
                     elif response_handler == "forward":
                         url = action_des["destination"]
                         if action_des.get("recreate_url", True):
-                            fscheme, fnetloc, _, _, _, _ = urllib.parse.urlparse(url)
-                            url = urllib.parse.urlunparse((fscheme, fnetloc, request.uri.decode("UTF-8"), "", "", ""))
+                            fscheme, fnetloc, _, _, _, _ = urlparse(url)
+                            url = urlunparse((fscheme, fnetloc, request.uri.decode("UTF-8"), "", "", ""))
                         response = ForwardResource(url, headers=action_des.get("request_headers", {}))
                     
                     
@@ -193,6 +172,39 @@ class HTTPJsonResource(resource.Resource):
             
             return response
 
+        # Rebuild the request URL for route matching
+        url = "{scheme}://{host}{port}{path_args}".format(
+            scheme="https" if request.isSecure() else "http",
+            host=request.getRequestHostname().decode() or "-",
+            port=f":{request.getHost().port}" if request.getHost().port != {True: 443, False: 80}[request.isSecure()] else "",
+            path_args=request.uri.decode()
+        )
+
+        route_descriptor, route_match, middlewares = self.filter_routes(url)
+        print(route_descriptor, route_match)
+        return utils.apply_middlewares(self.opts, middlewares, _getChild)(route_descriptor, route_match, request)
+
+    def filter_routes(self, uri:str):
+        parsed_uri = urlparse(uri)
+        if parsed_uri.scheme not in ["http", "https"]:
+            raise HTTPException(f"Unrecognised scheme '{parsed_uri.scheme}'")
+
+        # Match on any of scheme://host(:port)/path?args, /path?args, /path in that order
+        request_parts = [uri]
+        if parsed_uri.query:
+            request_parts.append(f"{parsed_uri.path}?{parsed_uri.query}")
+        request_parts.append(parsed_uri.path)
+
         route_descriptor, route_match = self.routes.get_descriptor(*request_parts, rfilter=lambda x: x.get("protocol") == "http")
         middlewares = self.routes.get_descriptors(*request_parts, rfilter=lambda x: x.get("protocol") == "http_middleware")
-        return utils.apply_middlewares(middlewares, _getChild)(route_descriptor, route_match, request)
+        return route_descriptor, route_match, middlewares
+
+class HTTPJsonServerFactory(server.Site):
+    proto = "HTTP"
+
+    # Proxy filter_routes to the HTTPJsonResource object
+    def filter_routes(self, uri: str):
+        return self.resource.filter_routes(uri)
+
+    def __init__(self, variables: dict, routes: JsonRoutes, files_root: str, *args, **kwargs):
+        super().__init__(HTTPJsonResource(variables, routes, files_root), *args, **kwargs)

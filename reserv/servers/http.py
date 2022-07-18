@@ -181,7 +181,6 @@ class HTTPJsonResource(resource.Resource):
         )
 
         route_descriptor, route_match, middlewares = self.filter_routes(url)
-        print(route_descriptor, route_match)
         return utils.apply_middlewares(self.opts, middlewares, _getChild)(route_descriptor, route_match, request)
 
     def filter_routes(self, uri:str):

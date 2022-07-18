@@ -1,10 +1,22 @@
 [
     {
         "protocol" : "http",
-        "route" : "^/index.html$",
+        "route" : "^/serve$",
         "action" : {
-          "handler" : "serve",
-          "path" : "./index.html"
+            "handler" : "serve",
+            "path" : "./index.html"
         }
-      }
+    },
+    {
+        "protocol" : "http",
+        "route" : "^/raw$",
+        "action" : {
+            "handler" : "raw",
+            "code" : 202,
+            "headers" : {
+                "X-Raw" : "Raw Header"
+            },
+            "body" : "Raw Body"
+        }
+    }
 ]

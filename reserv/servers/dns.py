@@ -88,7 +88,7 @@ def normalise_response(replacements, route, query, record_class, responses):
             try:
                 kwargs[k] = arg_types.get(k, str)(kwargs[k])
             except (ValueError, TypeError):
-                raise DNSException(f"Uncastable type '{v}' for DNS {dns.QUERY_TYPES[record_class.TYPE]} response")
+                raise DNSException(f"Uncastable type '{kwargs[k]}' for DNS {dns.QUERY_TYPES[record_class.TYPE]} response")
 
         # Extract varargs
         args = []

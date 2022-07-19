@@ -5,6 +5,7 @@ import os
 import re
 import time
 import uuid
+from typing import Callable, Generator, Tuple
 
 logger = logging.getLogger()
 
@@ -46,26 +47,25 @@ class JsonRoutes(object):
         self._update_route_descriptors()
         return self._route_descriptors
 
-    def get_descriptor(self, *routes, rfilter=lambda x: True):
-        return (self.get_descriptors(*routes, rfilter=rfilter, first=True) or [({}, "")])[0]
+    def get_descriptor(self, *routes: str, rfilter: Callable=lambda x: True) -> Tuple[dict, str]:
+        try:
+            return next(self.get_descriptors(*routes, rfilter=rfilter))
+        except StopIteration:
+            return ({}, "")
 
-    def get_descriptors(self, *routes, rfilter=lambda x: True, first=False):
+    def get_descriptors(self, *routes: str, rfilter: Callable=lambda x: True) -> Generator[Tuple[dict, str], None, None]:
         self._update_route_descriptors()
-        descriptors = []
         for route_descriptor in self._route_descriptors:
             for route in routes:
                 # A route_descriptor without a route will match all routes
                 if ("route" not in route_descriptor or re.search(route_descriptor["route"], route)) and rfilter(route_descriptor):
                     logger.debug("[!] Matched route {}: {}".format(route, repr(route_descriptor)))
-                    descriptors.append((route_descriptor, route))
-                    if first:
-                        return descriptors
+                    yield (route_descriptor, route)
 
                     # Only record the first matching route_descriptor for a set of routes
                     break
                 else:
                     logger.debug("[-] Checked route {}: {}".format(route, repr(route_descriptor)))
-        return descriptors
 
     def _update_route_descriptors(self):
         # Only update the cache if self.cache_invalidate_time seconds have passed

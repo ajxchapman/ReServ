@@ -86,7 +86,7 @@ def get_ipv6_address(dest="2001:4860:4860::8888", port=80):
 def apply_middlewares(opts, routes, next_function):
     # Apply middlewares
     _func = next_function
-    for middleware, _ in routes[::-1]:
+    for middleware, _ in list(routes)[::-1]:
         middleware_des = middleware.get("action")
         _middleware_module_name = middleware_des.get("module")
         if _middleware_module_name is None:

@@ -19,7 +19,7 @@ class JsonRoutes(object):
         self.path_globs = list(args)
         self.key_func = key_func or JsonRoutes.DEFAULT_SORT_KEY
         self.cache_invalidate_time = cache_invalidate_time
-        self.format_args = {**{str(k).upper() : v for k, v in variables.items()}, **{str(k).upper() : v for k, v in kwargs.items()}}
+        self.replacements = {**{str(k) : v for k, v in variables.items()}, **{str(k) : v for k, v in kwargs.items()}}
 
         self._cache = {}
         self._cache_update = 0
@@ -27,20 +27,23 @@ class JsonRoutes(object):
         self._route_descriptors = []
         self._update_route_descriptors()
 
-    def replace_variables(self, repl, regex=False):
-        if isinstance(repl, str):
-            for variable in re.findall("\{\{([A-Za-z0-9_-]+)\}\}", repl):
-                # Don't use string format to avoid key errors with regex syntax, e.g. '[0-2]{1, 3}'
+    def replace_variables(self, obj: object, regex: bool=False) -> object:
+        def _replace(match):
+            variable = match.group(1).strip()
+            if variable in self.replacements:
                 # HACK to allow non-regex string replacements in regex "route" variables
                 if regex:
-                    repl = repl.replace("{{" + variable + "}}", re.escape(str(self.format_args.get(variable.upper(), ""))))
-                else:
-                    repl = repl.replace("{{" + variable + "}}", str(self.format_args.get(variable.upper(), "")))
-        elif isinstance(repl, list):
-            repl = [self.replace_variables(value) for value in repl]
-        elif isinstance(repl, dict):
-            repl = {key: self.replace_variables(value, regex=key in ["route"]) for key, value in repl.items()}
-        return repl
+                    return re.escape(str(self.replacements[variable]))
+                return str(self.replacements[variable])
+            return f"{{{{{match.group(1)}}}}}"
+
+        if isinstance(obj, str):
+            return re.sub("\{\{\s*([A-Za-z0-9_-]+)\s*\}\}", _replace, obj)
+        elif isinstance(obj, list):
+            return [self.replace_variables(value) for value in obj]
+        elif isinstance(obj, dict):
+            return {key: self.replace_variables(value, regex=key in ["route"]) for key, value in obj.items()}
+        return obj
 
     @property
     def route_descriptors(self):

@@ -1,4 +1,4 @@
 [{
     "protocol" : "http",
-    "route" : "{{REPLACE}}"
+    "route" : "{{ replace }}"
 }]

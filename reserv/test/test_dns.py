@@ -1,3 +1,4 @@
+import argparse
 import os
 import ipaddress
 import time
@@ -15,7 +16,7 @@ class NoopProtocol:
 class TestDNS(unittest.TestCase):
     def setUp(self) -> None:
         routes = JsonRoutes(os.path.join(os.path.dirname(__file__), "fragments", "jsonroutes", "dns.json"))
-        self.factory = DNSJsonServerFactory({}, routes)
+        self.factory = DNSJsonServerFactory({}, routes, argparse.Namespace())
 
     def sendMessage(self, message):
         protocol = NoopProtocol()

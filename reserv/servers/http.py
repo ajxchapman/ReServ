@@ -77,6 +77,14 @@ class HTTPJsonResource(resource.Resource):
         super().__init__(*args, **kwargs)
 
     def getChild(self, request_path, request):
+        # Rebuild the request URL for route matching
+        url = "{scheme}://{host}{port}{path_args}".format(
+            scheme="https" if request.isSecure() else "http",
+            host=request.getRequestHostname().decode() or "-",
+            port=f":{request.getHost().port}" if request.getHost().port != {True: 443, False: 80}[request.isSecure()] else "",
+            path_args=request.uri.decode()
+        )
+
         def _getChild(route_descriptor, route_match, request):
             response = SimpleResource(404, content=b'Not Found')
 
@@ -171,14 +179,6 @@ class HTTPJsonResource(resource.Resource):
                         request.write = lambda data: _write(request, headers, replace, data)
             
             return response
-
-        # Rebuild the request URL for route matching
-        url = "{scheme}://{host}{port}{path_args}".format(
-            scheme="https" if request.isSecure() else "http",
-            host=request.getRequestHostname().decode() or "-",
-            port=f":{request.getHost().port}" if request.getHost().port != {True: 443, False: 80}[request.isSecure()] else "",
-            path_args=request.uri.decode()
-        )
 
         route_descriptor, route_match, middlewares = self.filter_routes(url)
         return utils.apply_middlewares(self.opts, middlewares, _getChild)(route_descriptor, route_match, request)

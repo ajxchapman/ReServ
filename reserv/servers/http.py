@@ -2,6 +2,7 @@ import copy
 import logging
 import os
 import re
+from typing import List, Tuple
 from urllib.parse import urlparse, urlunparse
 
 from twisted.internet import reactor
@@ -183,7 +184,7 @@ class HTTPJsonResource(resource.Resource):
         route_descriptor, route_match, middlewares = self.filter_routes(url)
         return utils.apply_middlewares(self.opts, middlewares, _getChild)(route_descriptor, route_match, request)
 
-    def filter_routes(self, uri:str):
+    def filter_routes(self, uri: str, method: str="GET") -> Tuple[dict, str, List[dict]]:
         parsed_uri = urlparse(uri)
         if parsed_uri.scheme not in ["http", "https"]:
             raise HTTPException(f"Unrecognised scheme '{parsed_uri.scheme}'")
@@ -194,7 +195,18 @@ class HTTPJsonResource(resource.Resource):
             request_parts.append(f"{parsed_uri.path}?{parsed_uri.query}")
         request_parts.append(parsed_uri.path)
 
-        route_descriptor, route_match = self.routes.get_descriptor(*request_parts, rfilter=lambda x: x.get("protocol") == "http")
+        route_descriptor = None
+        route_match = None
+        for _route_descriptor, _route_match in self.routes.get_descriptors(*request_parts, rfilter=lambda x: x.get("protocol") == "http"):
+            _action_des = _route_descriptor.get("action")
+            if _action_des is None:
+                continue
+            
+            if _action_des.get("method", method) == method:
+                route_descriptor = _route_descriptor
+                route_match = _route_match
+                break
+
         middlewares = self.routes.get_descriptors(*request_parts, rfilter=lambda x: x.get("protocol") == "http_middleware")
         return route_descriptor, route_match, middlewares
 

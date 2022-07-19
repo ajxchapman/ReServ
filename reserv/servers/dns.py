@@ -2,6 +2,8 @@ import inspect
 import logging
 import random
 import re
+
+from typing import List, Tuple, Union
 from urllib.parse import parse_qs, urlparse
 
 from twisted.names import dns, server
@@ -190,9 +192,8 @@ class DNSJsonServerFactory(server.DNSServerFactory):
         def _handleQuery(route_descriptor, qname, lookup_cls, qtype, message, protocol, address):
             return self._lookup(route_descriptor, qname, lookup_cls, qtype, 1000)
 
+        # Standardise the query
         query = message.queries[0]
-
-        # Standardise the query name
         qname = query.name.name
         if not isinstance(qname, str):
             qname = qname.decode('idna')
@@ -201,38 +202,31 @@ class DNSJsonServerFactory(server.DNSServerFactory):
         # At this point we only know of dns.IN lookup classes
         lookup_cls = dns.IN
 
-        route_descriptor, qname, middlewares = self.filter_routes(f"dns://{qname}?type={query.type}")
+        route_descriptor, qname, middlewares = self.filter_routes(qname, qtype=query.type)
         response = utils.apply_middlewares(self.opts, middlewares, _handleQuery)(route_descriptor, qname, lookup_cls, query.type, message, protocol, address)
         self.gotResolverResponse(response, protocol, message, address)
 
 
-    def filter_routes(self, uri):
-        parsed_uri = urlparse(uri)
-        parsed_qs = parse_qs(parsed_uri.query)
-        if parsed_uri.scheme != "dns":
-            raise DNSException(f"Unrecognised scheme '{parsed_uri.scheme}'")
-        query_name = parsed_uri.hostname
-        query_cls = int(parsed_qs.get("cls", [dns.IN])[0]) # default to dns.IN
-        query_type = parsed_qs.get("type", [dns.Record_A.TYPE])[0] # default to dns.Record_A
-        query_type = dns.REV_TYPES.get(query_type) or int(query_type)
+    def filter_routes(self, qname:str, qtype: Union[str, int]=dns.Record_A.TYPE, qcls: int=dns.IN) -> Tuple[dict, str, List[dict]]:
+        qtype = dns.REV_TYPES.get(qtype) or int(qtype)
 
         # Access route_descriptors directly to perform complex filtering
         route_descriptor = {}
-        for _route_descriptor, _ in self.routes.get_descriptors(query_name, rfilter=lambda x: x.get("protocol") == "dns"):
+        for _route_descriptor, _ in self.routes.get_descriptors(qname, rfilter=lambda x: x.get("protocol") == "dns"):
             _action_des = _route_descriptor.get("action")
             if _action_des is None:
                 continue
 
-            if query_cls == _action_des.get("class", dns.IN):
+            if qcls == _action_des.get("class", dns.IN):
                 # Convert the route_descriptor type to an integer
-                rd_type = _action_des.get("type", query_type)
+                rd_type = _action_des.get("type", qtype)
                 if not isinstance(rd_type, int):
                     rd_type = dns.REV_TYPES.get(rd_type, 0)
 
                 # If the lookup type matches the route_descriptor type
-                if query_type == rd_type:
+                if qtype == rd_type:
                     route_descriptor = _route_descriptor
                     break
 
-        middlewares = self.routes.get_descriptors(query_name, rfilter=lambda x: x.get("protocol") == "dns_middleware")
-        return route_descriptor, query_name, middlewares
+        middlewares = self.routes.get_descriptors(qname, rfilter=lambda x: x.get("protocol") == "dns_middleware")
+        return route_descriptor, qname, middlewares

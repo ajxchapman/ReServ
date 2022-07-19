@@ -47,7 +47,7 @@ def _write(request, headers, replacements, data):
     # NOTE: This will only work if the pattern attempted to be replaced does not
     # appear on a data boundary
     for r in replacements:
-        data = re.sub(r["pattern"], r["replacement"], data)
+        data = re.sub(r["pattern"].encode(), r["replacement"].encode(), data)
     request.__class__.write(request, data)
 
 def get_script_response(resource_path, request):
@@ -79,7 +79,7 @@ class HTTPJsonResource(resource.Resource):
 
     def getChild(self, request_path, request):
         # Rebuild the request URL for route matching
-        url = "{scheme}://{host}{port}{path_args}".format(
+        request.reconstructed_url = "{scheme}://{host}{port}{path_args}".format(
             scheme="https" if request.isSecure() else "http",
             host=request.getRequestHostname().decode() or "-",
             port=f":{request.getHost().port}" if request.getHost().port != {True: 443, False: 80}[request.isSecure()] else "",
@@ -94,27 +94,40 @@ class HTTPJsonResource(resource.Resource):
                 if action_des is not None:
                     response_handler = action_des.get("handler", "serve")
 
-                    if response_handler == "serve":
-                        # Replace regex groups in the route path
-                        resource_path = action_des["path"]
-                        for i, group in enumerate(re.search(route_descriptor["route"], route_match).groups()):
-                            if group is not None:
-                                resource_path = resource_path.replace("${}".format(i + 1), group)
+                    # Process replacements
+                    parsed_url = urlparse(request.reconstructed_url)
+                    match = re.search(route_descriptor["route"], route_match)
+                    replacements = {
+                        "url" : request.reconstructed_url,
+                        "scheme" : parsed_url.scheme,
+                        "hostname" : parsed_url.hostname,
+                        "port" : str(parsed_url.port or {"http" : 80, "https" : 443}[parsed_url.scheme]),
+                        "path" : parsed_url.path,
+                        "query" : parsed_url.query,
+                        **{str(k) : v for k, v in enumerate(match.groups(), 1)},
+                        **match.groupdict()
+                    }
+                    action_des = utils.replace_variables(action_des, replacements)
 
+                    if response_handler == "raw":
+                        code = action_des.get("code", 200)
+                        body = action_des.get("body", "").encode("UTF-8")
+                        response = SimpleResource(code, content=body)
+                    
+                    elif response_handler == "serve":
                         # Security: Ensure the absolute resource_path is within the `self.filesroot` directory!
                         # Prepend the resource_path with the self.filesroot and canonicalize
-                        resource_path = os.path.abspath(os.path.join(self.filesroot, resource_path.lstrip("/")))
+                        resource_path = os.path.abspath(os.path.join(self.filesroot, action_des["path"].lstrip("/")))
                         if resource_path.startswith(self.filesroot):
-                            # If the resource_path does not exist, or is a directory, search for an index.py in each url path directory
+                            # If the resource_path does not exist, or is a directory, search for an index.py in each url parent directory
                             if not os.path.isfile(resource_path):
-                                search_path = ""
-                                search_dirs = [""] + resource_path.replace(self.filesroot, "").strip("/").split("/")
-                                for search_dir in search_dirs:
-                                    search_path = os.path.join(search_path, search_dir)
-                                    if os.path.isfile(os.path.join(self.filesroot, search_path, "index.py")):
-                                        resource_path = os.path.join(self.filesroot, search_path, "index.py")
+                                search_path = resource_path
+                                while search_path.startswith(self.filesroot):
+                                    resource_path = os.path.join(search_path, "index.py")
+                                    if os.path.isfile(resource_path):
                                         break
-                            
+                                    search_path = os.path.dirname(search_path)
+                                
                             if os.path.isfile(resource_path):
                                 # Execute python scripts
                                 if os.path.splitext(resource_path)[1].lower() == ".py":
@@ -149,39 +162,22 @@ class HTTPJsonResource(resource.Resource):
                                 finally:
                                     request.postpath = rewrite.encode().split(b'/')
                         response = get_script_response(action_des["path"], request)
-                    elif response_handler == "raw":
-                        code = action_des.get("code", 200)
-                        body = action_des.get("body", "").encode("UTF-8")
-                        response = SimpleResource(code, content=body)
+
                     elif response_handler == "forward":
                         url = action_des["destination"]
                         if action_des.get("recreate_url", True):
                             fscheme, fnetloc, _, _, _, _ = urlparse(url)
-                            url = urlunparse((fscheme, fnetloc, request.uri.decode("UTF-8"), "", "", ""))
+                            url = urlunparse((fscheme, fnetloc, request.uri.decode(), "", "", ""))
                         response = ForwardResource(url, headers=action_des.get("request_headers", {}))
                     
-                    
-                    headers = action_des.get("headers", {})
-                    # Take a copy of the `replace` array as we will modify it afterwards
-                    replace = copy.deepcopy(action_des.get("replace", []))
-                    if len(headers) or len(replace):
-                        if len(replace):
-                            # Prepare the replacements
-                            for replace_descriptor in replace:
-                                replacement = replace_descriptor["replacement"]
-                                replacement = replacement.replace("{hostname}", host)
-                                replacement = replacement.replace("{port}", str(port))
-                                replacement = replacement.replace("{path}", path)
-                                replacement = replacement.replace("{scheme}", scheme)
-                                replace_descriptor["pattern"] = replace_descriptor["pattern"].encode()
-                                replace_descriptor["replacement"] = replacement.encode()
-                        
+
+                    if action_des.get("headers", {}) or action_des.get("replace", []):
                         # Patch request.write to replace headers after rendering and perform replacements
-                        request.write = lambda data: _write(request, headers, replace, data)
+                        request.write = lambda data: _write(request, action_des.get("headers", {}), action_des.get("replace", []), data)
             
             return response
 
-        route_descriptor, route_match, middlewares = self.filter_routes(url)
+        route_descriptor, route_match, middlewares = self.filter_routes(request.reconstructed_url, method=request.method.decode())
         return utils.apply_middlewares(self.opts, middlewares, _getChild)(route_descriptor, route_match, request)
 
     def filter_routes(self, uri: str, method: str="GET") -> Tuple[dict, str, List[dict]]:

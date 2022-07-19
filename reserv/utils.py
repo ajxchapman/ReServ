@@ -22,10 +22,9 @@ def get_variables(config):
     _variables = {**_variables, **config.get("variables", {})}
     return _variables
 
-def replace_variables(obj, replacements):
+def replace_variables(obj: object, replacements: dict) -> object:
     if isinstance(obj, str):
-        for variable in re.findall("((?:\{\{)[A-Za-z0-9_-]+(?:\}\})|\$[0-9]+)", obj):
-            obj = obj.replace(variable, str(replacements.get(variable.strip("${}"), "")))
+        return re.sub("\{\{\s*([A-Za-z0-9_-]+)\s*\}\}|\$([0-9]+)", lambda x: replacements.get((x.group(1) or x.group(2)).strip(), ""), obj)
     elif isinstance(obj, list):
         obj = [replace_variables(value, replacements) for value in obj]
     elif isinstance(obj, dict):

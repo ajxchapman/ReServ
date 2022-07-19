@@ -13,8 +13,6 @@ class TestDNSNormalise(unittest.TestCase):
     def test_normalise_A_default(self):
         results = normalise_response(
             replacements, 
-            ".*\.example.com", 
-            "test.example.com", 
             dns.Record_A, 
             "127.0.0.1"
         )
@@ -26,8 +24,6 @@ class TestDNSNormalise(unittest.TestCase):
     def test_normalise_A_args(self):
         results = normalise_response(
             replacements, 
-            ".*\.example.com", 
-            "test.example.com", 
             dns.Record_A, 
             {"address" : "127.0.0.1"}
         )
@@ -39,8 +35,6 @@ class TestDNSNormalise(unittest.TestCase):
     def test_normalise_AAAA(self):
         results = normalise_response(
             replacements, 
-            ".*\.example.com", 
-            "test.example.com", 
             dns.Record_AAAA, 
             "::1"
         )
@@ -52,8 +46,6 @@ class TestDNSNormalise(unittest.TestCase):
     def test_normalise_AAAA_args(self):
         results = normalise_response(
             replacements, 
-            ".*\.example.com", 
-            "test.example.com", 
             dns.Record_AAAA, 
             {"address" : "::1"}
         )
@@ -65,8 +57,6 @@ class TestDNSNormalise(unittest.TestCase):
     def test_normalise_replace(self):
         results = normalise_response(
             replacements, 
-            ".*\.example.com", 
-            "test.example.com", 
             dns.Record_A, 
             "{{ipv4_address}}"
         )
@@ -77,9 +67,7 @@ class TestDNSNormalise(unittest.TestCase):
 
     def test_normalise_replace_match(self):
         results = normalise_response(
-            replacements, 
-            "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?).example.com", 
-            "127.0.0.1.example.com", 
+            {**replacements, "1" : "127", "2" : "0", "3" : "0", "4" : "1"},
             dns.Record_A, 
             "$1.$2.$3.$4"
         )

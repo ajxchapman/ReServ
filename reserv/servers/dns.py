@@ -3,7 +3,7 @@ import logging
 import random
 import re
 
-from typing import List, Tuple, Union
+from typing import Dict, List, Tuple, Union
 from urllib.parse import parse_qs, urlparse
 
 from twisted.names import dns, server
@@ -66,7 +66,7 @@ record_signatures = {
     -1 : ("name", {"name" : type_bytes, "ttl" : int}, []), # Catch-All
 }
 
-def normalise_response(replacements, route, query, record_class, responses):
+def normalise_response(replacements: Dict[str, str], record_class: object, responses: List[dict]):
     default, arg_types, varargs = record_signatures.get(record_class.TYPE, record_signatures[-1])
 
     # Coerce the response into a list
@@ -82,8 +82,9 @@ def normalise_response(replacements, route, query, record_class, responses):
                 raise DNSException(f"Record {record_class.fancybasename} has no default")
             kwargs = {default : response}
        
-        # Replace replacements and search groups in response
-        kwargs = utils.replace_variables(kwargs, {**replacements, **{str(k): v for k, v in enumerate(re.search(route, query).groups(), 1)}})
+        # Process replacements
+        # NOTE: This is delayed until this point so that scripts can return values to be replaced, e.g. `{{ipv4_addrress}}`
+        kwargs = utils.replace_variables(kwargs, replacements)
 
         # Cast response kwargs to correct types
         for k in kwargs.keys():
@@ -159,7 +160,13 @@ class DNSJsonServerFactory(server.DNSServerFactory):
                 except:
                     logger.exception("Error executing script {}".format(action["script"]))
 
-            responses = normalise_response(self.variables, route_descriptor["route"], qname, record_class, responses)
+            match = re.search(route_descriptor["route"], qname)
+            replacements = {
+                **self.variables,
+                **{str(k) : v for k, v in enumerate(match.groups(), 1)},
+                **match.groupdict()
+            }
+            responses = normalise_response(replacements, record_class, responses)
             for response in responses if not action.get("random", False) else [random.choice(responses)]:
                 if response.ttl is None:
                     response.ttl = ttl

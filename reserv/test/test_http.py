@@ -3,31 +3,9 @@ import os
 import unittest
 from urllib.parse import urlparse
 
-from twisted.web.test.requesthelper import DummyRequest
-
+from test.utils import HttpRequest
 from servers.http import HTTPJsonServerFactory
 from jsonroutes import JsonRoutes
-
-class HttpRequest(DummyRequest):
-    def __init__(self, parsed_uri, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        
-        self.startedWriting = False
-        self._serverName = parsed_uri.hostname.encode()
-        self.uri = parsed_uri.path
-        if len(parsed_uri.query):
-            self.uri += "?" + parsed_uri.query
-        self.uri = self.uri.encode()
-
-    def isSecure(self):
-        return self.uri.startswith(b'https')
-
-    def write(self, data):
-        super().write(data)
-        self.startedWriting = True
-
-    def getResponseHeader(self, name):
-        return self.responseHeaders.getRawHeaders(name.lower(), [None])[0]
 
 class TestHTTP(unittest.TestCase):
     def setUp(self) -> None:

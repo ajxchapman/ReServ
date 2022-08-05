@@ -116,6 +116,7 @@ def apply_middlewares(opts, routes, next_function):
 
 script_cache = {}
 def exec_cached_script(root, path):
+    if not path.startswith(root):
     path = os.path.abspath(os.path.join(root, path.lstrip("/")))
     if not path.startswith(root):
         raise Exception("Attempted to load script '{}' from outside the `files` directory.".format(path))

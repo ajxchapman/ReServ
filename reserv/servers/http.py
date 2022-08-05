@@ -50,14 +50,15 @@ def _write(request, headers, replacements, data):
         data = re.sub(r["pattern"].encode(), r["replacement"].encode(), data)
     request.__class__.write(request, data)
 
-def get_script_response(resource_path, request):
+def get_script_response(descriptor, root, resource_path, request):
     try:
-        res = utils.exec_cached_script(resource_path)
+        res = utils.exec_cached_script(root, resource_path)
+
         # If the script exports an `app` variable, load it as a WSGI resource
         if "app" in res:
             return WSGIResource(reactor, reactor.getThreadPool(), res["app"])
-        elif "get_resource" in res:
-            return resource.IResource(res["get_resource"](request))
+        elif "get_resource" in res: 
+            return resource.IResource(res["get_resource"](request, *descriptor.get("args", []), **descriptor.get("kwargs", {})))
         raise Exception("Script does not export `app` variable or `get_resource` function.")
     except:
         # Catch all exceptions and log them
@@ -133,7 +134,7 @@ class HTTPJsonResource(resource.Resource):
                                 if os.path.splitext(resource_path)[1].lower() == ".py":
                                     # Fixup the request path
                                     request.postpath.insert(0, request.prepath.pop(0))
-                                    response = get_script_response(resource_path, request)
+                                    response = get_script_response(action_des, self.filesroot, resource_path, request)
                                 else:
                                     code = action_des.get("code", 200)
                                     with open(resource_path, "rb") as f:
@@ -141,6 +142,7 @@ class HTTPJsonResource(resource.Resource):
                                     response = SimpleResource(code, content=data)
 
                     elif response_handler == "script":
+                        resource_path = os.path.abspath(os.path.join(self.filesroot, action_des["path"].lstrip("/")))
                         # Fixup the request path
                         request.postpath.insert(0, request.prepath.pop(0))
 
@@ -161,7 +163,7 @@ class HTTPJsonResource(resource.Resource):
                                     rewrite = match.group(0)
                                 finally:
                                     request.postpath = rewrite.encode().split(b'/')
-                        response = get_script_response(action_des["path"], request)
+                        response = get_script_response(action_des, self.filesroot, resource_path, request)
 
                     elif response_handler == "forward":
                         url = action_des["destination"]

@@ -1,0 +1,22 @@
+[
+    {
+        "protocol" : "http",
+        "route" : "^/basic$",
+        "action" : {
+            "handler" : "script",
+            "path" : "./basic.py"
+        }
+    },
+    {
+        "protocol" : "http",
+        "route" : "^/args$",
+        "action" : {
+            "handler" : "script",
+            "path" : "./args.py",
+            "args" : ["arg1", "arg2"],
+            "kwargs" : {
+                "kwarg1" : "value1"
+            }
+        }
+    }
+]

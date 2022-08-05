@@ -128,4 +128,10 @@ def exec_cached_script(root, path):
             exec(code, _vars, _vars)
             cache["vars"] = _vars
             cache["mtime"] = os.path.getmtime(path)
+
+            # Call script.init
+            if "init" in _vars:
+                config = get_config()
+                script_config = get_config().get("scripts", {}).get(_vars.get("name", _vars["__name__"]), {})
+                _vars["init"](config, script_config)
     return cache["vars"]
